@@ -60,9 +60,3 @@ DISTFILES += \
     shaders/phong.vert \
     shaders/texMap.frag \
     shaders/texMap.vert
-
-macx {
-    shader_files.files = $$PWD/shaders
-    shader_files.path = Contents
-    QMAKE_BUNDLE_DATA += shader_files
-}

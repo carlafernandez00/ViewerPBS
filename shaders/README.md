@@ -53,3 +53,14 @@ make
 ```
 Alternatively, you can use **Qt Creator IDE** (included with the Qt installation) to simplify the process and take advantage of its features.
 
+## Running on macOS
+
+If you're using macOS, after building the application, you need to set up a symbolic link to the shaders directory:
+
+```sh
+cd release/ViewerPBS.app/Contents/MacOS
+ln -s ../../../shaders ../shaders
+```
+
+This ensures that the application can find the shader files when running on macOS.
+
