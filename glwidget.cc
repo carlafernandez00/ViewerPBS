@@ -147,12 +147,45 @@ bool GLWidget::LoadModel(const QString &filename) {
 
     // TODO(students): Create / Initialize buffers.
     //MESH: You need to create 1 VAO and 4 VBO
-    //mesh_->vertices -> attrib location 0
-    //mesh_->normals -> attrib location 1
-    //mesh_->texCoords -> attrib location 2
-    //mesh_->faces -> elements
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) {
+        std::cerr << "OpenGL error at line " << __LINE__ << ": " << error << std::endl;
+    }
 
+    // Create the VAO
+    glGenVertexArrays(1, &VAO); 
 
+    // Create the vertices VBOs
+    glGenBuffers(1, &VBO_v);
+    glGenBuffers(1, &VBO_n);
+    glGenBuffers(1, &VBO_tc);
+    glGenBuffers(1, &VBO_i);
+
+    // bind VAO 
+    glBindVertexArray(VAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_v);
+    glBufferData(GL_ARRAY_BUFFER, mesh_->vertices_.size() * sizeof(float), &mesh_->vertices_[0], GL_STATIC_DRAW);
+    glVertexAttribPointer(kVertexAttributeIdx, 3, GL_FLOAT, GL_FALSE, 0, (void *)0); // mesh_->vertices -> attrib location 0
+    glEnableVertexAttribArray(kVertexAttributeIdx); 
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_n);
+    glBufferData(GL_ARRAY_BUFFER, mesh_->normals_.size() * sizeof(float), &mesh_->normals_[0], GL_STATIC_DRAW);
+    glVertexAttribPointer(kNormalAttributeIdx, 3, GL_FLOAT, GL_FALSE, 0, (void *)0); // mesh_->normals -> attrib location 1
+    glEnableVertexAttribArray(kNormalAttributeIdx);
+
+  
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_tc);
+    glBufferData(GL_ARRAY_BUFFER, mesh_->texCoords_.size() * sizeof(float), &mesh_->texCoords_[0], GL_STATIC_DRAW);
+    glVertexAttribPointer(kTexCoordAttributeIdx, 2, GL_FLOAT, GL_FALSE, 0, (void *)0); // mesh_->texCoords -> attrib location 2
+    glEnableVertexAttribArray(kTexCoordAttributeIdx);
+
+    
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBO_i);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh_->faces_.size() * sizeof(int), &mesh_->faces_[0], GL_STATIC_DRAW);
+
+    // unbind VAO
+    glBindVertexArray(0);
 
     //SKY BOX: You need to create 1 VAO and 2 VBO:
     // vertices -> attrib location 0
@@ -357,7 +390,7 @@ void GLWidget::paintGL ()
             GLint projection_location, view_location, model_location,
             normal_matrix_location, specular_map_location, diffuse_map_location,
             fresnel_location, color_map_location, roughness_map_location, metalness_map_location,
-            current_text_location, light_location, roughness_location, metalness_location;
+            current_text_location, light_location, camera_location, roughness_location, metalness_location;
 
             //MESH-----------------------------------------------------------------------------------------
             //general shader setting
@@ -376,19 +409,22 @@ void GLWidget::paintGL ()
             current_text_location     = programs_[currentShader_]->uniformLocation("current_texture");
             fresnel_location          = programs_[currentShader_]->uniformLocation("fresnel");
             light_location            = programs_[currentShader_]->uniformLocation("light");
+            camera_location           = programs_[currentShader_]->uniformLocation("camera_position");
             roughness_location        = programs_[currentShader_]->uniformLocation("roughness");
             metalness_location        = programs_[currentShader_]->uniformLocation("metalness");
 
-
+            // Model, View, Projection and Normal matrices
             glUniformMatrix4fv(projection_location, 1, GL_FALSE, &projection[0][0]);
             glUniformMatrix4fv(view_location, 1, GL_FALSE, &view[0][0]);
             glUniformMatrix4fv(model_location, 1, GL_FALSE, &model[0][0]);
             glUniformMatrix3fv(normal_matrix_location, 1, GL_FALSE, &normal[0][0]);
 
+            // Specular
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_CUBE_MAP, specular_map_);
             glUniform1i(specular_map_location, 0);
 
+            // Diffuse
             glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_CUBE_MAP, diffuse_map_);
             glUniform1i(diffuse_map_location, 1);
@@ -403,13 +439,17 @@ void GLWidget::paintGL ()
             glUniform1i(current_text_location, currentTexture_);
             glUniform3f(fresnel_location, fresnel_[0], fresnel_[1], fresnel_[2]);
             glUniform3f(light_location, 10, 0, 0);
+            glUniform3f(camera_location, camera_.GetPosition().x, camera_.GetPosition().y, camera_.GetPosition().z);
             glUniform1f(roughness_location, roughness_);
             glUniform1f(metalness_location, metalness_);
 
 
             // TODO(students): Implement draw call of the mesh
-
-
+            // Bind the VAO and draw the elements
+            glBindVertexArray(VAO);
+            glDrawElements(GL_TRIANGLES, mesh_->faces_.size(), GL_UNSIGNED_INT, (GLvoid*)0);
+            glBindVertexArray(0);
+            
             // TODO END.
 
 

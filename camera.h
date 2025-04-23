@@ -306,6 +306,12 @@ class Camera {
    * @param step New camera step.
    */
   void SetCameraStep(double step);
+
+  /**
+   * @brief GetPosition Returns the camera position in world space
+   * @return The camera position as a glm::vec3
+   */
+  glm::vec3 GetPosition() const;
 };
 
 }  //  namespace data_visualization

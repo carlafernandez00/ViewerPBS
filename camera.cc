@@ -184,4 +184,18 @@ void Camera::StopPanning(double x, double y) {
 
 void Camera::SetCameraStep(double step) { this->step_ = step; }
 
+glm::vec3 Camera::GetPosition() const {
+  // The camera position can be extracted from the inverse of the view matrix
+  // The view matrix is the transformation from world space to camera space
+  // Its inverse transforms from camera space to world space
+  // The camera is at origin (0,0,0) in camera space, so transforming this point
+  // gives us the camera position in world space
+  
+  glm::mat4 view = SetView();
+  glm::mat4 viewInverse = glm::inverse(view);
+  
+  // Extract the translation component (camera position)
+  return glm::vec3(viewInverse[3]);
+}
+
 }  //  namespace data_visualization
