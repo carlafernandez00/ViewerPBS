@@ -534,14 +534,15 @@ void GLWidget::paintGL ()
                 normal_matrix_location  = programs_[programs_.size()-1]->uniformLocation("normal_matrix");
                 specular_map_location   = programs_[programs_.size()-1]->uniformLocation("specular_map");
     
-                // Remove translation from view matrix
-                glm::mat4x4 skyView = view;
-                skyView[3][0] = 0.0f;
-                skyView[3][1] = 0.0f;
-                skyView[3][2] = 0.0f;
+                // Remove translation from view matrix -> so that the skybox is not moved when the 
+                // camera moves (illusion of being far away)
+                glm::mat4x4 sky_view = view;
+                sky_view[3][0] = 0.0f;
+                sky_view[3][1] = 0.0f;
+                sky_view[3][2] = 0.0f;
 
                 glUniformMatrix4fv(projection_location, 1, GL_FALSE, &projection[0][0]);
-                glUniformMatrix4fv(view_location, 1, GL_FALSE, &skyView[0][0]);
+                glUniformMatrix4fv(view_location, 1, GL_FALSE, &sky_view[0][0]);
                 glUniformMatrix4fv(model_location, 1, GL_FALSE, &model[0][0]);
                 glUniformMatrix3fv(normal_matrix_location, 1, GL_FALSE, &normal[0][0]);
 
