@@ -27,10 +27,45 @@ const std::vector<std::vector<std::string>> kShaderFiles = {
                 {"../shaders/ibl-pbs.vert",      "../shaders/ibl-pbs.frag"},
                 {"../shaders/sky.vert",          "../shaders/sky.frag"}};//sky needs to be the last one
 
+
+
 const int kVertexAttributeIdx = 0;
 const int kNormalAttributeIdx = 1;
 const int kTexCoordAttributeIdx = 2;
 
+// Define the Skybox
+const float kSkySize = 10.0f;
+float kSkyVertices[24] = {
+    -0.5f * kSkySize, -0.5f * kSkySize, -0.5f * kSkySize,	
+     0.5f * kSkySize, -0.5f * kSkySize, -0.5f * kSkySize,	
+    -0.5f * kSkySize, -0.5f * kSkySize,  0.5f * kSkySize, 
+     0.5f * kSkySize, -0.5f * kSkySize,  0.5f * kSkySize,
+    -0.5f * kSkySize,  0.5f * kSkySize, -0.5f * kSkySize,
+     0.5f * kSkySize,  0.5f * kSkySize, -0.5f * kSkySize,
+    -0.5f * kSkySize,  0.5f * kSkySize,  0.5f * kSkySize, 
+     0.5f * kSkySize,  0.5f * kSkySize,  0.5f * kSkySize
+};
+
+unsigned int kSkyFaces[36] = {
+  // Top
+  4, 7, 6,
+  4, 5, 7,
+  // Bottom
+  0, 3, 1,
+  0, 2, 3,
+  // Back
+  6, 3, 2,
+  6, 7, 3,
+  // Front
+  0, 1, 4,
+  4, 1, 5,
+  // Left
+  6, 0, 2,
+  6, 4, 0,
+  // Right
+  1, 3, 7,
+  7, 5, 1
+};
 
 bool ReadFile(const std::string filename, std::string *shader_source) {
   std::ifstream infile(filename.c_str());
@@ -112,7 +147,7 @@ GLWidget::GLWidget(QWidget *parent)
       skyVisible_(true),
       metalness_(0),
       roughness_(0)
-        {
+      {
   setFocusPolicy(Qt::StrongFocus);
 }
 
@@ -145,17 +180,15 @@ bool GLWidget::LoadModel(const QString &filename) {
     camera_.UpdateModel(mesh_->min_, mesh_->max_);
     // mesh_->computeNormals();
 
-    // TODO(students): Create / Initialize buffers.
-    //MESH: You need to create 1 VAO and 4 VBO
     GLenum error = glGetError();
     if (error != GL_NO_ERROR) {
         std::cerr << "OpenGL error at line " << __LINE__ << ": " << error << std::endl;
     }
 
-    // Create the VAO
+    // Generate VAO
     glGenVertexArrays(1, &VAO); 
 
-    // Create the vertices VBOs
+    // Create vertices VBOs
     glGenBuffers(1, &VBO_v);
     glGenBuffers(1, &VBO_n);
     glGenBuffers(1, &VBO_tc);
@@ -187,22 +220,44 @@ bool GLWidget::LoadModel(const QString &filename) {
     // unbind VAO
     glBindVertexArray(0);
 
-    //SKY BOX: You need to create 1 VAO and 2 VBO:
+    //SKY BOX:
+    // Store the vertices and faces of the skybox
+    for(unsigned int i=0; i<sizeof(kSkyVertices); i++)
+    {
+        skyVertices_.push_back(kSkyVertices[i]);
+    }
+
+    for(unsigned int i=0; i<sizeof(kSkyFaces); i++)
+    {
+        skyFaces_.push_back(kSkyFaces[i]);
+    }
+
+    // Generate the VAO and VBOs for the skybox
+    glGenVertexArrays(1, &VAO_sky);
+    glGenBuffers(1, &VBO_v_sky);
+    glGenBuffers(1, &VBO_i_sky);
+
+    // bind VAO
+    glBindVertexArray(VAO_sky);
+
     // vertices -> attrib location 0
-    //faces -> elements
+    glBindBuffer(GL_ARRAY_BUFFER, VBO_v_sky);
+    glBufferData(GL_ARRAY_BUFFER, skyVertices_.size() * sizeof(float), &skyVertices_[0], GL_STATIC_DRAW);
+    glVertexAttribPointer(kVertexAttributeIdx, 3, GL_FLOAT, GL_FALSE, 0, (void *)0); 
+    glEnableVertexAttribArray(kVertexAttributeIdx);
 
-    /*
-     *
-     *
-     *          4           5
-     *      6           7
-     *
-     *
-     *          0           1
-     *      2           3
-     */
+    // faces -> elements
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBO_i_sky);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, skyFaces_.size() * sizeof(int), &skyFaces_[0], GL_STATIC_DRAW);
+    
+    // unbind VAO
+    glBindVertexArray(0);
 
-    // TODO END.
+    // unbind VBO
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+
 
     emit SetFaces(QString(std::to_string(mesh_->faces_.size() / 3).c_str()));
     emit SetVertices(
@@ -302,6 +357,18 @@ void GLWidget::initializeGL ()
   LoadModel(".null");//create an sphere
 
   initialized_ = true;
+
+  // Load Specular CubeMap
+  bool specular_loaded = LoadSpecularMap("../textures/desert_specular"); // TODO: Choose cube maps in UX + move to main_window
+  if (!specular_loaded) {
+    std::cerr << "Error loading specular cube map." << std::endl;
+  }
+  // Load Diffuse CubeMap
+  bool diffuse_loaded = LoadDiffuseMap("../textures/desert_specular"); // TODO: Choose cube maps in UX + move to main_window
+  if (!diffuse_loaded) {
+    std::cerr << "Error loading diffuse cube map." << std::endl;
+  }
+
 }
 
 void GLWidget::resizeGL (int w, int h)
@@ -443,19 +510,21 @@ void GLWidget::paintGL ()
             glUniform1f(roughness_location, roughness_);
             glUniform1f(metalness_location, metalness_);
 
-
-            // TODO(students): Implement draw call of the mesh
             // Bind the VAO and draw the elements
             glBindVertexArray(VAO);
             glDrawElements(GL_TRIANGLES, mesh_->faces_.size(), GL_UNSIGNED_INT, (GLvoid*)0);
             glBindVertexArray(0);
-            
-            // TODO END.
 
 
             //SKY-----------------------------------------------------------------------------------------
             if(skyVisible_) {
                 //model = camera_.SetIdentity();
+
+                // Set depth function for skybox
+                GLint oldDepthFunc;
+                glGetIntegerv(GL_DEPTH_FUNC, &oldDepthFunc);
+                
+                glDepthFunc(GL_LEQUAL);
 
                 programs_[programs_.size()-1]->bind();
 
@@ -464,19 +533,30 @@ void GLWidget::paintGL ()
                 model_location          = programs_[programs_.size()-1]->uniformLocation("model");
                 normal_matrix_location  = programs_[programs_.size()-1]->uniformLocation("normal_matrix");
                 specular_map_location   = programs_[programs_.size()-1]->uniformLocation("specular_map");
+    
+                // Remove translation from view matrix
+                glm::mat4x4 skyView = view;
+                skyView[3][0] = 0.0f;
+                skyView[3][1] = 0.0f;
+                skyView[3][2] = 0.0f;
 
                 glUniformMatrix4fv(projection_location, 1, GL_FALSE, &projection[0][0]);
-                glUniformMatrix4fv(view_location, 1, GL_FALSE, &view[0][0]);
+                glUniformMatrix4fv(view_location, 1, GL_FALSE, &skyView[0][0]);
                 glUniformMatrix4fv(model_location, 1, GL_FALSE, &model[0][0]);
                 glUniformMatrix3fv(normal_matrix_location, 1, GL_FALSE, &normal[0][0]);
 
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_CUBE_MAP, specular_map_);
-                glUniform1i(specular_map_location, 0);
+                programs_[programs_.size() - 1]->setUniformValue("specular_map", 0);
 
-                // TODO(students): implement the draw call of the sky box
+                // Bind the VAO and draw the elements
+                glBindVertexArray(VAO_sky);
+                glDrawElements(GL_TRIANGLES, skyFaces_.size(), GL_UNSIGNED_INT, (GLvoid*)0);
+                glBindVertexArray(0);
+                programs_[programs_.size() - 1]->release();
 
-                // TODO END.
+                // Restore original depth function
+                glDepthFunc(oldDepthFunc);
             }
         }
     }

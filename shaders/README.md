@@ -55,11 +55,12 @@ Alternatively, you can use **Qt Creator IDE** (included with the Qt installation
 
 ## Running on macOS
 
-If you're using macOS, after building the application, you need to set up a symbolic link to the shaders directory:
+If you're using macOS, after building the application, you need to set up a symbolic link to the shaders and textures directory:
 
 ```sh
 cd release/ViewerPBS.app/Contents/MacOS
 ln -s ../../../shaders ../shaders
+ln -s ../../../textures ../textures
 ```
 
 This ensures that the application can find the shader files when running on macOS.
