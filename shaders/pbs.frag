@@ -67,14 +67,14 @@ vec3 compute_PBR(vec3 L, vec3 N, float metalness, float roughness, vec3 light_co
     // Compute Diffuse and Specular Factors
     vec3 f0 = mix(fresnel, albedo, metalness);
     vec3 Ks = fresnel_schlick(f0, LdotH);
-    vec3 Kd = (1.0 - Ks) * (1.0 - metalness);
+    vec3 Kd = (vec3(1.0) - Ks) * (1.0 - metalness);
 
     float alpha = roughness * roughness;
     float alphaSqr = alpha * alpha;
 
     // Diffuse BRDF
     vec3 Fd = lambert(albedo);
-    vec3 diffuse = Fd * RECIPROCAL_PI;
+    vec3 diffuse = Kd * Fd;
     
     // Specular BRDF
     float D_GGX = D_GGX(alphaSqr, NdotH);
@@ -82,7 +82,7 @@ vec3 compute_PBR(vec3 L, vec3 N, float metalness, float roughness, vec3 light_co
     vec3 specular = (D_GGX * G * Ks) / (4.0 * NdotL * NdotV + 1e-6);
 
     // BRDF
-    vec3 direct_light = Kd * diffuse + specular;
+    vec3 direct_light = diffuse + specular;
 
     vec3 total_light = direct_light * light_color * NdotL;
     return total_light;
@@ -96,5 +96,9 @@ void main (void) {
     vec3 light_dir = normalize(light - v_world_position);
 
     vec3 total_light = compute_PBR(light_dir, normal, metalness, roughness, light_color);
-    frag_color = vec4(total_light, 1.0);
+    
+    vec3 ambient = vec3(0.03) * albedo;
+    vec3 color = ambient + total_light;
+ 
+    frag_color = vec4(color, 1.0);
 }
