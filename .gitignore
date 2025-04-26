@@ -15,6 +15,7 @@ Makefile*
 # Build directories
 /debug/
 /release/
+/shaders/shaders
 
 # Object files
 *.o
