@@ -1,5 +1,4 @@
 #version 330
-in vec3 v_position;
 in vec3 v_normal;
 in vec2 v_uv;
 in vec3 v_world_position;
