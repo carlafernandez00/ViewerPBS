@@ -4,6 +4,7 @@
 
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QColorDialog>
 #include "./ui_main_window.h"
 
 namespace gui {
@@ -82,6 +83,18 @@ void MainWindow::on_actionLoad_Metalness_triggered()
         QMessageBox::warning(this, tr("Error"),
                              tr("The file could not be opened"));
     }
+}
+
+void gui::MainWindow::on_button_Albedo_Color_clicked() {
+  QColor color = QColorDialog::getColor(Qt::white, this, "Select Albedo Color");
+  
+  if (color.isValid()) {
+      double r = color.redF();   // Convert to 0.0-1.0 range
+      double g = color.greenF(); // Convert to 0.0-1.0 range
+      double b = color.blueF();  // Convert to 0.0-1.0 range
+      
+      ui->glwidget->SetAlbedo(r, g, b);
+  }
 }
 
 }  //  namespace gui

@@ -61,6 +61,12 @@ class MainWindow : public QMainWindow {
    */
   void on_actionLoad_Metalness_triggered();
 
+  /**
+   * @brief on_button_Albedo_Color_clicked Opens a color dialog to set the albedo color.
+  */
+  void on_button_Albedo_Color_clicked();
+
+
  private:
   Ui::MainWindow *ui;
 };

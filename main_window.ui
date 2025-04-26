@@ -317,6 +317,19 @@
           </item>
          </layout>
         </widget>
+        <widget class="QPushButton" name="button_Albedo_Color">
+         <property name="geometry">
+            <rect>
+                <x>20</x>
+                <y>450</y>
+                <width>120</width>
+                <height>30</height>
+            </rect>
+            </property>
+            <property name="text">
+            <string>Albedo Color</string>
+         </property>
+        </widget>
         <widget class="QWidget" name="horizontalLayoutWidget_2">
          <property name="geometry">
           <rect>
@@ -556,11 +569,28 @@
     <slot>SetSkyVisible(bool)</slot>
     <slot>SetRoughness(double)</slot>
     <slot>SetMetalness(double)</slot>
+    <slot>SetAlbedo(double, double, double)</slot>
    </slots>
   </customwidget>
  </customwidgets>
  <resources/>
  <connections>
+    <connection>
+    <sender>btn_albedo_color</sender>
+    <signal>clicked()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_button_Albedo_Color_clicked()</slot>
+    <hints>
+    <hint type="sourcelabel">
+    <x>80</x>
+    <y>465</y>
+    </hint>
+    <hint type="destinationlabel">
+    <x>414</x>
+    <y>319</y>
+    </hint>
+    </hints>
+    </connection>
   <connection>
    <sender>glwidget</sender>
    <signal>SetFaces(QString)</signal>

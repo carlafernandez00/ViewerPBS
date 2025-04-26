@@ -77,6 +77,11 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    */
   bool LoadMetalnessMap(const QString &filename);
 
+  /**
+   * @brief SetAlbedo Sets the albedo color.
+   */
+  void SetAlbedo(double, double, double);
+
  protected:
   /**
    * @brief initializeGL Initializes OpenGL variables and loads, compiles and
@@ -181,6 +186,11 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    * @brief roughness_ Indicates the general roughness properties of the model
    */
   float roughness_;
+
+  /**
+   * @brief albedo_ Albedo color components.
+   */
+  glm::vec3 albedo_;
 
 
 

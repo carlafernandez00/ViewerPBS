@@ -146,7 +146,8 @@ GLWidget::GLWidget(QWidget *parent)
       fresnel_(0.2, 0.2, 0.2),
       skyVisible_(true),
       metalness_(0),
-      roughness_(0)
+      roughness_(0),
+      albedo_(1.0, 1.0, 1.0)
       {
   setFocusPolicy(Qt::StrongFocus);
 }
@@ -222,15 +223,8 @@ bool GLWidget::LoadModel(const QString &filename) {
 
     //SKY BOX:
     // Store the vertices and faces of the skybox
-    for(unsigned int i=0; i<sizeof(kSkyVertices); i++)
-    {
-        skyVertices_.push_back(kSkyVertices[i]);
-    }
-
-    for(unsigned int i=0; i<sizeof(kSkyFaces); i++)
-    {
-        skyFaces_.push_back(kSkyFaces[i]);
-    }
+    skyVertices_.assign(kSkyVertices, kSkyVertices + sizeof(kSkyVertices)/sizeof(float));
+    skyFaces_.assign(kSkyFaces, kSkyFaces + sizeof(kSkyFaces)/sizeof(unsigned int));
 
     // Generate the VAO and VBOs for the skybox
     glGenVertexArrays(1, &VAO_sky);
@@ -286,11 +280,24 @@ bool GLWidget::LoadDiffuseMap(const QString &dir) {
 
 bool GLWidget::LoadColorMap(const QString &filename)
 {
-    //TODO Students
-    //Configure the texture with identifier color_map_. Take advantage of LoadImage("path", GL_TEXTURE_2D).
-    //Remember to configure the texture parameters.
-    bool res;
-    //TODO END
+    glBindTexture(GL_TEXTURE_2D, color_map_);
+
+    std::string path = filename.toUtf8().constData();
+    bool res = LoadImage(path, GL_TEXTURE_2D);
+
+    // Set texture parameters
+    if (res) {
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+      glGenerateMipmap(GL_TEXTURE_2D); // Generate mipmaps for better quality at different distances
+    }
+
+    // Unbind the texture
+    glBindTexture(GL_TEXTURE_2D, 0);
+
     update();
     return res;
 
@@ -298,22 +305,48 @@ bool GLWidget::LoadColorMap(const QString &filename)
 
 bool GLWidget::LoadRoughnessMap(const QString &filename)
 {
-    //TODO Students
-    //Configure the texture with identifier roughness_map_. Take advantage of LoadImage("path", GL_TEXTURE_2D)
-    //Remember to configure the texture parameters.
-    bool res;
-    //TODO END
+    glBindTexture(GL_TEXTURE_2D, roughness_map_);
+    
+    std::string path = filename.toUtf8().constData();
+    bool res = LoadImage(path, GL_TEXTURE_2D);
+
+    // Set texture parameters
+    if (res) {
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+      glGenerateMipmap(GL_TEXTURE_2D); // Generate mipmaps for better quality at different distances
+    }
+
+    // Unbind the texture
+    glBindTexture(GL_TEXTURE_2D, 0);
+    
     update();
     return res;
 }
 
 bool GLWidget::LoadMetalnessMap(const QString &filename)
 {
-    //TODO Students
-    //Configure the texture with identifier metalness_map_. Take advantage of LoadImage("path", GL_TEXTURE_2D)
-    //Remember to configure the texture parameters.
-    bool res;
-    //TODO END
+    glBindTexture(GL_TEXTURE_2D, metalness_map_);
+
+    std::string path = filename.toUtf8().constData();
+    bool res = LoadImage(path, GL_TEXTURE_2D);
+    
+    // Set texture parameters
+    if (res) {
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+      glGenerateMipmap(GL_TEXTURE_2D); // Generate mipmaps for better quality at different distances
+    }
+
+    // Unbind the texture
+    glBindTexture(GL_TEXTURE_2D, 0);
+
     update();
     return res;
 }
@@ -358,16 +391,35 @@ void GLWidget::initializeGL ()
 
   initialized_ = true;
 
-  // Load Specular CubeMap
-  bool specular_loaded = LoadSpecularMap("../textures/desert_specular"); // TODO: Choose cube maps in UX + move to main_window
+  // Initialize a Specular CubeMap
+  bool specular_loaded = LoadSpecularMap("../textures/desert_specular"); 
   if (!specular_loaded) {
     std::cerr << "Error loading specular cube map." << std::endl;
   }
-  // Load Diffuse CubeMap
-  bool diffuse_loaded = LoadDiffuseMap("../textures/desert_specular"); // TODO: Choose cube maps in UX + move to main_window
+  // Initialize a Diffuse CubeMap
+  bool diffuse_loaded = LoadDiffuseMap("../textures/desert_specular"); 
   if (!diffuse_loaded) {
     std::cerr << "Error loading diffuse cube map." << std::endl;
   }
+
+  // Initialize a Color Map
+  bool color_loaded = LoadColorMap("../textures/Metal053C_2K-PNG_Color.png");
+  if (!color_loaded) {
+    std::cerr << "Error loading color map." << std::endl;
+  }
+
+  // Initialize a Roughness Map
+  bool roughness_loaded = LoadRoughnessMap("../textures/Metal053C_2K-PNG_Roughness.png");
+  if (!roughness_loaded) {
+    std::cerr << "Error loading roughness map." << std::endl;
+  }
+
+  // Initialize a Metalness Map
+  bool metalness_loaded = LoadMetalnessMap("../textures/Metal053C_2K-PNG_Metalness.png");
+  if (!metalness_loaded) {
+    std::cerr << "Error loading metalness map." << std::endl;
+  }
+
 
 }
 
@@ -457,13 +509,12 @@ void GLWidget::paintGL ()
             GLint projection_location, view_location, model_location,
             normal_matrix_location, specular_map_location, diffuse_map_location,
             fresnel_location, color_map_location, roughness_map_location, metalness_map_location,
-            current_text_location, light_location, camera_location, roughness_location, metalness_location;
+            current_text_location, light_location, camera_location, roughness_location, metalness_location, albedo_location;
 
             //MESH-----------------------------------------------------------------------------------------
             //general shader setting
-
             programs_[currentShader_]->bind();
-
+            
             projection_location       = programs_[currentShader_]->uniformLocation("projection");
             view_location             = programs_[currentShader_]->uniformLocation("view");
             model_location            = programs_[currentShader_]->uniformLocation("model");
@@ -479,6 +530,7 @@ void GLWidget::paintGL ()
             camera_location           = programs_[currentShader_]->uniformLocation("camera_position");
             roughness_location        = programs_[currentShader_]->uniformLocation("roughness");
             metalness_location        = programs_[currentShader_]->uniformLocation("metalness");
+            albedo_location           = programs_[currentShader_]->uniformLocation("albedo");
 
             // Model, View, Projection and Normal matrices
             glUniformMatrix4fv(projection_location, 1, GL_FALSE, &projection[0][0]);
@@ -486,22 +538,31 @@ void GLWidget::paintGL ()
             glUniformMatrix4fv(model_location, 1, GL_FALSE, &model[0][0]);
             glUniformMatrix3fv(normal_matrix_location, 1, GL_FALSE, &normal[0][0]);
 
-            // Specular
+            // Specular CubeMap
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_CUBE_MAP, specular_map_);
             glUniform1i(specular_map_location, 0);
 
-            // Diffuse
+            // Diffuse CubeMap
             glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_CUBE_MAP, diffuse_map_);
             glUniform1i(diffuse_map_location, 1);
 
-            //TODO(students): active texture location for the following textures:
-            //Texture unit 3 color_map_
-            //Texture unit 4 roughness_map_
-            //Texture unit 5 metalness_map_
+            // Textures
+            // Color Map (Texture unit 3)
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, color_map_);
+            glUniform1i(color_map_location, 2);
 
-            //TODO END
+            // Roughness Map (Texture unit 4)
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, roughness_map_);
+            glUniform1i(roughness_map_location, 3);
+
+            // Metalness Map (Texture unit 5)
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, metalness_map_);
+            glUniform1i(metalness_map_location, 4);
 
             glUniform1i(current_text_location, currentTexture_);
             glUniform3f(fresnel_location, fresnel_[0], fresnel_[1], fresnel_[2]);
@@ -509,6 +570,7 @@ void GLWidget::paintGL ()
             glUniform3f(camera_location, camera_.GetPosition().x, camera_.GetPosition().y, camera_.GetPosition().z);
             glUniform1f(roughness_location, roughness_);
             glUniform1f(metalness_location, metalness_);
+            glUniform3f(albedo_location, albedo_[0], albedo_[1], albedo_[2]);
 
             // Bind the VAO and draw the elements
             glBindVertexArray(VAO);
@@ -534,15 +596,9 @@ void GLWidget::paintGL ()
                 normal_matrix_location  = programs_[programs_.size()-1]->uniformLocation("normal_matrix");
                 specular_map_location   = programs_[programs_.size()-1]->uniformLocation("specular_map");
     
-                // Remove translation from view matrix -> so that the skybox is not moved when the 
-                // camera moves (illusion of being far away)
-                glm::mat4x4 sky_view = view;
-                sky_view[3][0] = 0.0f;
-                sky_view[3][1] = 0.0f;
-                sky_view[3][2] = 0.0f;
 
                 glUniformMatrix4fv(projection_location, 1, GL_FALSE, &projection[0][0]);
-                glUniformMatrix4fv(view_location, 1, GL_FALSE, &sky_view[0][0]);
+                glUniformMatrix4fv(view_location, 1, GL_FALSE, &view[0][0]);
                 glUniformMatrix4fv(model_location, 1, GL_FALSE, &model[0][0]);
                 glUniformMatrix3fv(normal_matrix_location, 1, GL_FALSE, &normal[0][0]);
 
@@ -600,6 +656,12 @@ void GLWidget::SetFresnelG(double g) {
     update();
 }
 
+void GLWidget::SetAlbedo(double r, double g, double b) {
+    albedo_[0] = r;
+    albedo_[1] = g;
+    albedo_[2] = b;
+    update();
+}
 void GLWidget::SetCurrentTexture(int i)
 {
     currentTexture_ = i;
