@@ -90,14 +90,14 @@ vec3 compute_PBR(vec3 L, vec3 N, float metalness, float roughness, vec3 light_co
 
 void main (void) {
     vec3 light_color = vec3 (1.0f);
-    
+
     // get vectors
     vec3 normal = normalize(v_normal);
     vec3 light_dir = normalize(light - v_world_position);
 
     vec3 total_light = compute_PBR(light_dir, normal, metalness, roughness, light_color);
     
-    vec3 ambient = vec3(0.03) * albedo;
+    vec3 ambient = vec3(0.1) * albedo;
     vec3 color = ambient + total_light;
  
     frag_color = vec4(color, 1.0);
