@@ -147,7 +147,8 @@ GLWidget::GLWidget(QWidget *parent)
       skyVisible_(true),
       metalness_(0),
       roughness_(0),
-      albedo_(1.0, 1.0, 1.0)
+      albedo_(1.0, 1.0, 1.0),
+      useTextures_(false)
       {
   setFocusPolicy(Qt::StrongFocus);
 }
@@ -509,28 +510,30 @@ void GLWidget::paintGL ()
             GLint projection_location, view_location, model_location,
             normal_matrix_location, specular_map_location, diffuse_map_location,
             fresnel_location, color_map_location, roughness_map_location, metalness_map_location,
-            current_text_location, light_location, camera_location, roughness_location, metalness_location, albedo_location;
+            current_text_location, light_location, camera_location, roughness_location, metalness_location, 
+            use_textures_location, albedo_location;
 
             //MESH-----------------------------------------------------------------------------------------
             //general shader setting
             programs_[currentShader_]->bind();
             
-            projection_location       = programs_[currentShader_]->uniformLocation("projection");
-            view_location             = programs_[currentShader_]->uniformLocation("view");
-            model_location            = programs_[currentShader_]->uniformLocation("model");
-            normal_matrix_location    = programs_[currentShader_]->uniformLocation("normal_matrix");
-            specular_map_location     = programs_[currentShader_]->uniformLocation("specular_map");
-            diffuse_map_location      = programs_[currentShader_]->uniformLocation("diffuse_map");
-            color_map_location        = programs_[currentShader_]->uniformLocation("color_map");
-            roughness_map_location    = programs_[currentShader_]->uniformLocation("roughness_map");
-            metalness_map_location    = programs_[currentShader_]->uniformLocation("metalness_map");
-            current_text_location     = programs_[currentShader_]->uniformLocation("current_texture");
-            fresnel_location          = programs_[currentShader_]->uniformLocation("fresnel");
-            light_location            = programs_[currentShader_]->uniformLocation("light");
-            camera_location           = programs_[currentShader_]->uniformLocation("camera_position");
-            roughness_location        = programs_[currentShader_]->uniformLocation("roughness");
-            metalness_location        = programs_[currentShader_]->uniformLocation("metalness");
-            albedo_location           = programs_[currentShader_]->uniformLocation("albedo");
+            projection_location        = programs_[currentShader_]->uniformLocation("projection");
+            view_location              = programs_[currentShader_]->uniformLocation("view");
+            model_location             = programs_[currentShader_]->uniformLocation("model");
+            normal_matrix_location     = programs_[currentShader_]->uniformLocation("normal_matrix");
+            specular_map_location      = programs_[currentShader_]->uniformLocation("specular_map");
+            diffuse_map_location       = programs_[currentShader_]->uniformLocation("diffuse_map");
+            color_map_location         = programs_[currentShader_]->uniformLocation("color_map");
+            roughness_map_location     = programs_[currentShader_]->uniformLocation("roughness_map");
+            metalness_map_location     = programs_[currentShader_]->uniformLocation("metalness_map");
+            current_text_location      = programs_[currentShader_]->uniformLocation("current_texture");
+            fresnel_location           = programs_[currentShader_]->uniformLocation("fresnel");
+            light_location             = programs_[currentShader_]->uniformLocation("light");
+            camera_location            = programs_[currentShader_]->uniformLocation("camera_position");
+            roughness_location         = programs_[currentShader_]->uniformLocation("roughness");
+            metalness_location         = programs_[currentShader_]->uniformLocation("metalness");
+            albedo_location            = programs_[currentShader_]->uniformLocation("albedo");
+            use_textures_location      = programs_[currentShader_]->uniformLocation("use_textures");
 
             // Model, View, Projection and Normal matrices
             glUniformMatrix4fv(projection_location, 1, GL_FALSE, &projection[0][0]);
@@ -571,6 +574,7 @@ void GLWidget::paintGL ()
             glUniform1f(roughness_location, roughness_);
             glUniform1f(metalness_location, metalness_);
             glUniform3f(albedo_location, albedo_[0], albedo_[1], albedo_[2]);
+            glUniform1i(use_textures_location, useTextures_ ? 1 : 0);
 
             // Bind the VAO and draw the elements
             glBindVertexArray(VAO);
@@ -662,6 +666,12 @@ void GLWidget::SetAlbedo(double r, double g, double b) {
     albedo_[2] = b;
     update();
 }
+
+void GLWidget::SetUseTextures(bool use) {
+    useTextures_ = use;
+    update();
+}
+
 void GLWidget::SetCurrentTexture(int i)
 {
     currentTexture_ = i;

@@ -8,11 +8,14 @@ uniform vec3 camera_position; // Camera position
 uniform vec3 fresnel;         // F0: Frenel 
 
 // Material Properties
+uniform bool use_textures;
+
 // Global Values
 uniform vec3 albedo; 
 uniform float roughness;
 uniform float metalness;
-// Materual Maps
+
+// Material Maps
 uniform sampler2D color_map;
 uniform sampler2D roughness_map;
 uniform sampler2D metalness_map;
@@ -55,7 +58,7 @@ float G(float alphaSqr, float NdotL, float NdotV)
 }
   
 // PBR for one light
-vec3 compute_PBR(vec3 L, vec3 N, float metalness, float roughness, vec3 light_color){
+vec3 compute_PBR(vec3 L, vec3 N, float material_metalness, float material_roughness, vec3 material_albedo, vec3 light_color){
     // Compute vectors
     vec3 V = normalize(camera_position - v_world_position);
     vec3 H = normalize(L + V);
@@ -65,15 +68,15 @@ vec3 compute_PBR(vec3 L, vec3 N, float metalness, float roughness, vec3 light_co
     float NdotL = clamp(dot(N,L), 0.0, 1.0);
 
     // Compute Diffuse and Specular Factors
-    vec3 f0 = mix(fresnel, albedo, metalness);
+    vec3 f0 = mix(fresnel, material_albedo, material_metalness);
     vec3 Ks = fresnel_schlick(f0, LdotH);
-    vec3 Kd = (vec3(1.0) - Ks) * (1.0 - metalness);
+    vec3 Kd = (vec3(1.0) - Ks) * (1.0 - material_metalness);
 
-    float alpha = roughness * roughness;
-    float alphaSqr = alpha * alpha;
+    float alpha = material_roughness * material_roughness;
+    float alphaSqr = (alpha * alpha) + 1e-6;
 
     // Diffuse BRDF
-    vec3 Fd = lambert(albedo);
+    vec3 Fd = lambert(material_albedo);
     vec3 diffuse = Kd * Fd;
     
     // Specular BRDF
@@ -90,15 +93,32 @@ vec3 compute_PBR(vec3 L, vec3 N, float metalness, float roughness, vec3 light_co
 
 void main (void) {
     vec3 light_color = vec3 (1.0f);
+    vec3 ambient_light = vec3(0.2f); 
 
     // get vectors
     vec3 normal = normalize(v_normal);
     vec3 light_dir = normalize(light - v_world_position);
 
-    vec3 total_light = compute_PBR(light_dir, normal, metalness, roughness, light_color);
-    
-    vec3 ambient = vec3(0.1) * albedo;
-    vec3 color = ambient + total_light;
- 
+    // Get material properties
+    vec3 material_albedo;
+    float material_roughness;
+    float material_metalness;
+
+    if (use_textures) {
+        material_albedo = texture(color_map, v_uv).xyz;
+        material_roughness = texture(roughness_map, v_uv).x;
+        material_metalness = texture(metalness_map, v_uv).x;
+    }
+    else{
+        material_albedo = albedo;
+        material_roughness = roughness;
+        material_metalness = metalness;
+    }
+
+    vec3 total_light = compute_PBR(light_dir, normal, material_metalness, material_roughness, material_albedo, light_color);
+
+    float NdotL = clamp(dot(normal, light_dir), 0.0, 1.0);
+    vec3 color = ambient_light * material_albedo;
+    color += total_light;
     frag_color = vec4(color, 1.0);
 }

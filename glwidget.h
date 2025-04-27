@@ -192,6 +192,10 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    */
   glm::vec3 albedo_;
 
+  /**
+   * @brief useTextures_ Indicates whether to use textures or not when computing the lighting
+   */
+  bool useTextures_;
 
 
   GLuint VAO;
@@ -252,6 +256,11 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    * @brief SetFresnelG Sets the fresnel F0 green component.
    */
   void SetFresnelG(double);
+
+  /**
+   * @brief SetUseTextures Sets whether to use textures or not.
+   */
+  void SetUseTextures(bool);
 
   /**
    * @brief SetCurrentTexture sets the current texture to show

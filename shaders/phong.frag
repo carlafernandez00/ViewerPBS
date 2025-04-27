@@ -6,15 +6,14 @@ in vec3 v_world_position;
 uniform vec3 light;           // Light position
 uniform vec3 camera_position; // Camera position
 
-uniform sampler2D color_map;
+uniform vec3 albedo; 
 
 out vec4 frag_color;
 
 void main(void) {
     // light and object colors
     vec3 light_color = vec3 (1.0f);
-    vec3 object_color = vec3(0.0f, 0.0f, 1.0f);
-    vec3 base_color = vec3(texture(color_map, v_uv));
+    vec3 object_color = albedo;
 
     // get vectors
     vec3 normal = normalize(v_normal);
