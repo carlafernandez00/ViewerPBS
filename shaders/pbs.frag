@@ -3,12 +3,12 @@ in vec3 v_normal;
 in vec2 v_uv;
 in vec3 v_world_position;
 
-uniform vec3 light;           // Light position
-uniform vec3 camera_position; // Camera position
-uniform vec3 fresnel;         // F0: Frenel 
+uniform vec3 light;            // Light position
+uniform vec3 camera_position;  // Camera position
 
 // Material Properties
 uniform bool use_textures;
+uniform vec3 fresnel;          // F0: Frenel 
 
 // Global Values
 uniform vec3 albedo; 
@@ -44,17 +44,16 @@ float D_GGX(float alphaSqr, float NdotH){
     return alphaSqr / (PI * f * f);
 }
 
-// WalterEtAl Distribution Function
-float WalterEtAl(float alphaSqr, float NdotVec){
-    float NdotVecSqr = NdotVec*NdotVec;
-
-    return 2/(1 + sqrt(1 + alphaSqr * (1-NdotVecSqr)/(NdotVecSqr)));
+// Schlick GGX Distribution Function
+float GGX(float NdotVec, float k){
+    return NdotVec / (NdotVec * (1.0 - k) + k);
 }
 
-// Smith Model
-float G(float alphaSqr, float NdotL, float NdotV)
+// Smith Model  
+float GeometrySmith(float alpha, float NdotL, float NdotV)
 {
-    return WalterEtAl(alphaSqr, NdotV) * WalterEtAl(alphaSqr, NdotL);
+    float k = pow(alpha + 1.0, 2.0) / 8.0;
+    return GGX(NdotL, k) * GGX(NdotV, k);
 }
   
 // PBR for one light
@@ -81,7 +80,7 @@ vec3 compute_PBR(vec3 L, vec3 N, float material_metalness, float material_roughn
     
     // Specular BRDF
     float D_GGX = D_GGX(alphaSqr, NdotH);
-    float G = G(alphaSqr, NdotL, NdotV);
+    float G = GeometrySmith(alpha, NdotL, NdotV);
     vec3 specular = (D_GGX * G * Ks) / (4.0 * NdotL * NdotV + 1e-6);
 
     // BRDF
@@ -117,8 +116,8 @@ void main (void) {
 
     vec3 total_light = compute_PBR(light_dir, normal, material_metalness, material_roughness, material_albedo, light_color);
 
-    float NdotL = clamp(dot(normal, light_dir), 0.0, 1.0);
     vec3 color = ambient_light * material_albedo;
     color += total_light;
+    
     frag_color = vec4(color, 1.0);
 }

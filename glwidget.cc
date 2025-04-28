@@ -157,6 +157,7 @@ GLWidget::~GLWidget() {
   if (initialized_) {
     glDeleteTextures(1, &specular_map_);
     glDeleteTextures(1, &diffuse_map_);
+    glDeleteTextures(1, &brdfLUT_map_);
   }
 }
 
@@ -277,6 +278,31 @@ bool GLWidget::LoadDiffuseMap(const QString &dir) {
   glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
   update();
   return res;
+}
+
+bool GLWidget::LoadBRDFLUTMap(const QString &filename)
+{
+    glBindTexture(GL_TEXTURE_2D, brdfLUT_map_);
+
+    std::string path = filename.toUtf8().constData();
+    bool res = LoadImage(path, GL_TEXTURE_2D);
+
+    // Set texture parameters
+    if (res) {
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+      glGenerateMipmap(GL_TEXTURE_2D); // Generate mipmaps for better quality at different distances
+    }
+
+    // Unbind the texture
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    update();
+    return res;
+
 }
 
 bool GLWidget::LoadColorMap(const QString &filename)
@@ -508,7 +534,7 @@ void GLWidget::paintGL ()
 
         if (mesh_ != nullptr) {
             GLint projection_location, view_location, model_location,
-            normal_matrix_location, specular_map_location, diffuse_map_location,
+            normal_matrix_location, specular_map_location, diffuse_map_location, brdfLUT_map_location
             fresnel_location, color_map_location, roughness_map_location, metalness_map_location,
             current_text_location, light_location, camera_location, roughness_location, metalness_location, 
             use_textures_location, albedo_location;
@@ -523,6 +549,7 @@ void GLWidget::paintGL ()
             normal_matrix_location     = programs_[currentShader_]->uniformLocation("normal_matrix");
             specular_map_location      = programs_[currentShader_]->uniformLocation("specular_map");
             diffuse_map_location       = programs_[currentShader_]->uniformLocation("diffuse_map");
+            brdfLUT_map_location       = programs_[currentShader_]->uniformLocation("brdfLUT_map");
             color_map_location         = programs_[currentShader_]->uniformLocation("color_map");
             roughness_map_location     = programs_[currentShader_]->uniformLocation("roughness_map");
             metalness_map_location     = programs_[currentShader_]->uniformLocation("metalness_map");
@@ -551,21 +578,26 @@ void GLWidget::paintGL ()
             glBindTexture(GL_TEXTURE_CUBE_MAP, diffuse_map_);
             glUniform1i(diffuse_map_location, 1);
 
+            // BRDF LUT Texture
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, brdfLUT_map_);
+            glUniform1i(brdfLUT_map_location, 2);
+
             // Textures
             // Color Map (Texture unit 3)
-            glActiveTexture(GL_TEXTURE2);
+            glActiveTexture(GL_TEXTURE3);
             glBindTexture(GL_TEXTURE_2D, color_map_);
-            glUniform1i(color_map_location, 2);
+            glUniform1i(color_map_location, 3);
 
             // Roughness Map (Texture unit 4)
-            glActiveTexture(GL_TEXTURE3);
+            glActiveTexture(GL_TEXTURE4);
             glBindTexture(GL_TEXTURE_2D, roughness_map_);
-            glUniform1i(roughness_map_location, 3);
+            glUniform1i(roughness_map_location, 4);
 
             // Metalness Map (Texture unit 5)
-            glActiveTexture(GL_TEXTURE4);
+            glActiveTexture(GL_TEXTURE5);
             glBindTexture(GL_TEXTURE_2D, metalness_map_);
-            glUniform1i(metalness_map_location, 4);
+            glUniform1i(metalness_map_location, 5);
 
             glUniform1i(current_text_location, currentTexture_);
             glUniform3f(fresnel_location, fresnel_[0], fresnel_[1], fresnel_[2]);

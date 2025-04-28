@@ -45,13 +45,21 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
 
   /**
    * @brief LoadDiffuseMap Will load load a cube map that will be used for the
-   * specular component.
+   * diffuse component.
    * @param filename Path to the directory containing the 6 textures (right,
    * left, top, bottom, front back) of the sube map that will be used for the
    * diffuse component.
    * @return Whether it was able to load the textures.
    */
   bool LoadDiffuseMap(const QString &filename);
+
+  /**
+   * @brief LoadBRDFLUTMap Will load load a texture map that will be used for the
+   * specular component.
+   * @param filename Path to the texture file.
+   * @return Whether it was able to load the texture.
+   */
+  bool LoadBRDFLUTMap(const QString &filename);
 
   /**
    * @brief LoadColorMap Will load load a texture map that will be used for the
@@ -126,6 +134,11 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    * @brief specular_map_ Diffuse cubemap texture.
    */
   GLuint specular_map_;
+
+  /**
+   * @brief brdfLUT_map_  BRDF LUT texture.
+   */
+  GLuint brdfLUT_map_;
 
   /**
    * @brief color_map_ Color texture.
