@@ -11,13 +11,9 @@ uniform vec3 albedo;
 uniform float roughness;
 uniform float metalness;
 
-uniform samplerCube specular_map;
+uniform samplerCube weighted_specular_map;
 uniform samplerCube diffuse_map;
 uniform sampler2D brdfLUT_map;
-
-out vec4 frag_color;
-
-const float MAX_REFLECTION_LOD = 7.0;
 
 out vec4 frag_color;
 
@@ -47,7 +43,8 @@ vec3 compute_light(vec3 N, vec3 R, vec3 V)
     vec3 ambient    = Kd * diffuse; 
     
     // Load Specular
-    vec3 prefiltered_color = textureLod(specular_map, R,  roughness * MAX_REFLECTION_LOD).rgb;
+    float lod = roughness * 4.0; // convert from [0, 1] to [0, 4] (5 mip levels)
+    vec3 prefiltered_color = textureLod(weighted_specular_map, R,  lod).rgb;
     vec2 env_BRDF = texture(brdfLUT_map, vec2(NdotV, roughness)).rg;
     vec3 specular = prefiltered_color * (Ks * env_BRDF.x + env_BRDF.y);
 
@@ -58,8 +55,8 @@ vec3 compute_light(vec3 N, vec3 R, vec3 V)
 void main (void) {
     // get vectors
     vec3 normal = normalize(v_normal);
-    vec3 reflect_dir = normalize(reflect(-light_dir, normal));
     vec3 view_dir = normalize(camera_position - v_world_position);
+    vec3 reflect_dir = normalize(reflect(-view_dir, normal));
 
     vec3 color = compute_light(normal, reflect_dir, view_dir);
     

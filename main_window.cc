@@ -42,6 +42,26 @@ void MainWindow::on_actionLoad_Specular_triggered() {
   }
 }
 
+void MainWindow::on_actionLoad_WeightedSpecular_triggered() {
+  QString dir =
+      QFileDialog::getExistingDirectory(this, "Weighted Specular CubeMap folder.", "./");
+  if (!dir.isEmpty()) {
+    if (!ui->glwidget->LoadWeightedSpecularMap(dir))
+      QMessageBox::warning(this, tr("Error"),
+                           tr("The file could not be opened"));
+  }
+}
+
+void MainWindow::on_actionLoad_BrdfLUT_triggered() {
+  QString file =
+      QFileDialog::getOpenFileName(this, "BRDF LUT texture.", "./");
+  if (!file.isEmpty()) {
+    if (!ui->glwidget->LoadBRDFLUTMap(file))
+      QMessageBox::warning(this, tr("Error"),
+                           tr("The file could not be opened"));
+  }
+}
+
 void MainWindow::on_actionLoad_Diffuse_triggered() {
   QString dir =
       QFileDialog::getExistingDirectory(this, "Diffuse CubeMap folder.", "./");

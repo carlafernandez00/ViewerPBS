@@ -13,7 +13,7 @@ out vec3 v_normal;
 out vec3 v_world_position;
 
 void main(void)  {
-    v_normal = mat3(transpose(inverse(model))) * normal; // normal in world space
+    v_normal = normal; // normal in world space
      
     v_world_position = vec3(model * vec4( vert, 1.0f ));               // position of the vertex in world space
     gl_Position = projection * view * vec4(v_world_position, 1.0f);    // position of the vertex in clip space

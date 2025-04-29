@@ -44,6 +44,16 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
   bool LoadSpecularMap(const QString &filename);
 
   /**
+   * @brief LoadWeightedSpecularMap Will load load a cube map that will be used for the
+   * specular component.
+   * @param filename Path to the directory containing the 6 textures (right,
+   * left, top, bottom, front back) of the sube map that will be used for the
+   * specular component.
+   * @return Whether it was able to load the textures.
+   */
+  bool LoadWeightedSpecularMap(const QString &filename);
+  
+  /**
    * @brief LoadDiffuseMap Will load load a cube map that will be used for the
    * diffuse component.
    * @param filename Path to the directory containing the 6 textures (right,
@@ -134,6 +144,11 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    * @brief specular_map_ Diffuse cubemap texture.
    */
   GLuint specular_map_;
+
+  /**
+   * @brief weighted_specular_map_ Weighted specular cubemap texture.
+   */
+  GLuint weighted_specular_map_;
 
   /**
    * @brief brdfLUT_map_  BRDF LUT texture.

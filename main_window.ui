@@ -517,6 +517,8 @@
     <addaction name="separator"/>
     <addaction name="actionLoad_Specular"/>
     <addaction name="actionLoad_Diffuse"/>
+    <addaction name="actionLoad_WeightedSpecular"/>
+    <addaction name="actionLoad_BrdfLUT"/>
     <addaction name="separator"/>
     <addaction name="actionLoad_Color"/>
     <addaction name="actionLoad_Roughness"/>
@@ -546,6 +548,16 @@
     <string>Load Diffuse...</string>
    </property>
   </action>
+   <action name="actionLoad_WeightedSpecular">
+    <property name="text">
+      <string>Load Weighted Specular Map (IBL)...</string>
+    </property>
+   </action>
+   <action name="actionLoad_BrdfLUT">
+     <property name="text">
+      <string>Load BRDF LUT...</string>
+     </property>
+   </action>
   <action name="actionLoad_Color">
    <property name="text">
     <string>Load Color...</string>

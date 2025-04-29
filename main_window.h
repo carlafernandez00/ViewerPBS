@@ -38,6 +38,18 @@ class MainWindow : public QMainWindow {
   void on_actionLoad_Specular_triggered();
 
   /**
+   * @brief on_actionLoad_WeightedSpecular_triggered Opens a file dialog to load a cube
+   * map with mip levels that will be used for the prefiltered environment map.
+   */
+  void on_actionLoad_WeightedSpecular_triggered();
+
+  /**
+   * @brief on_actionLoad_BrdfLUT_triggered Opens a file dialog to load a texture
+   * map that will be used for the brdf LUT.
+   */
+  void on_actionLoad_BrdfLUT_triggered();
+
+  /**
    * @brief on_actionLoad_Diffuse_triggered Opens a file dialog to load a cube
    * map that will be used for the diffuse component.
    */

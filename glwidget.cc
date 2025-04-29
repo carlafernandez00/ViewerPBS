@@ -83,12 +83,12 @@ bool ReadFile(const std::string filename, std::string *shader_source) {
   return true;
 }
 
-bool LoadImage(const std::string &path, GLuint cube_map_pos) {
+bool LoadImage(const std::string &path, GLuint cube_map_pos, int mip_level = 0) {
   QImage image;
   bool res = image.load(path.c_str());
   if (res) {
     QImage gl_image = image.mirrored();
-    glTexImage2D(cube_map_pos, 0, GL_RGBA, image.width(), image.height(), 0,
+    glTexImage2D(cube_map_pos, mip_level, GL_RGBA, image.width(), image.height(), 0,
                  GL_BGRA, GL_UNSIGNED_BYTE, image.bits());
   }
   return res;
@@ -280,6 +280,24 @@ bool GLWidget::LoadDiffuseMap(const QString &dir) {
   return res;
 }
 
+bool GLWidget::LoadWeightedSpecularMap(const QString &dir) {
+  glBindTexture(GL_TEXTURE_CUBE_MAP, weighted_specular_map_);
+  bool res = LoadCubeMap(dir);
+
+  // Generate mipmaps for the specular map
+  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+  glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+  glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+
+  glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+  update();
+  return res;
+}
+
 bool GLWidget::LoadBRDFLUTMap(const QString &filename)
 {
     glBindTexture(GL_TEXTURE_2D, brdfLUT_map_);
@@ -392,6 +410,8 @@ void GLWidget::initializeGL ()
   //generating needed textures
   glGenTextures(1, &specular_map_);
   glGenTextures(1, &diffuse_map_);
+  glGenTextures(1, &weighted_specular_map_);
+  glGenTextures(1, &brdfLUT_map_);
   glGenTextures(1, &color_map_);
   glGenTextures(1, &roughness_map_);
   glGenTextures(1, &metalness_map_);
@@ -419,12 +439,12 @@ void GLWidget::initializeGL ()
   initialized_ = true;
 
   // Initialize a Specular CubeMap
-  bool specular_loaded = LoadSpecularMap("../textures/desert_specular"); 
+  bool specular_loaded = LoadSpecularMap("../textures/Lycksele2/sky"); 
   if (!specular_loaded) {
     std::cerr << "Error loading specular cube map." << std::endl;
   }
   // Initialize a Diffuse CubeMap
-  bool diffuse_loaded = LoadDiffuseMap("../textures/desert_specular"); 
+  bool diffuse_loaded = LoadDiffuseMap("../textures/Lycksele2/irradiance_map"); 
   if (!diffuse_loaded) {
     std::cerr << "Error loading diffuse cube map." << std::endl;
   }
@@ -447,7 +467,17 @@ void GLWidget::initializeGL ()
     std::cerr << "Error loading metalness map." << std::endl;
   }
 
+  // Initialize a BRDF LUT Map
+  bool brdf_loaded = LoadBRDFLUTMap("../textures/Lycksele2/brdf_lut.png");
+  if (!brdf_loaded) {
+    std::cerr << "Error loading brdf LUT map." << std::endl;
+  }
 
+  // Initialize a Weighted Specular CubeMap
+  bool weighted_specular_loaded = LoadWeightedSpecularMap("../textures/Lycksele2/specular_prefilter");
+  if (!weighted_specular_loaded) {
+    std::cerr << "Error loading weighted specular cube map." << std::endl;
+  }
 }
 
 void GLWidget::resizeGL (int w, int h)
@@ -534,8 +564,8 @@ void GLWidget::paintGL ()
 
         if (mesh_ != nullptr) {
             GLint projection_location, view_location, model_location,
-            normal_matrix_location, specular_map_location, diffuse_map_location, brdfLUT_map_location
-            fresnel_location, color_map_location, roughness_map_location, metalness_map_location,
+            normal_matrix_location, specular_map_location, diffuse_map_location, brdfLUT_map_location,
+            weighted_specular_map_location, fresnel_location, color_map_location, roughness_map_location, metalness_map_location,
             current_text_location, light_location, camera_location, roughness_location, metalness_location, 
             use_textures_location, albedo_location;
 
@@ -543,24 +573,25 @@ void GLWidget::paintGL ()
             //general shader setting
             programs_[currentShader_]->bind();
             
-            projection_location        = programs_[currentShader_]->uniformLocation("projection");
-            view_location              = programs_[currentShader_]->uniformLocation("view");
-            model_location             = programs_[currentShader_]->uniformLocation("model");
-            normal_matrix_location     = programs_[currentShader_]->uniformLocation("normal_matrix");
-            specular_map_location      = programs_[currentShader_]->uniformLocation("specular_map");
-            diffuse_map_location       = programs_[currentShader_]->uniformLocation("diffuse_map");
-            brdfLUT_map_location       = programs_[currentShader_]->uniformLocation("brdfLUT_map");
-            color_map_location         = programs_[currentShader_]->uniformLocation("color_map");
-            roughness_map_location     = programs_[currentShader_]->uniformLocation("roughness_map");
-            metalness_map_location     = programs_[currentShader_]->uniformLocation("metalness_map");
-            current_text_location      = programs_[currentShader_]->uniformLocation("current_texture");
-            fresnel_location           = programs_[currentShader_]->uniformLocation("fresnel");
-            light_location             = programs_[currentShader_]->uniformLocation("light");
-            camera_location            = programs_[currentShader_]->uniformLocation("camera_position");
-            roughness_location         = programs_[currentShader_]->uniformLocation("roughness");
-            metalness_location         = programs_[currentShader_]->uniformLocation("metalness");
-            albedo_location            = programs_[currentShader_]->uniformLocation("albedo");
-            use_textures_location      = programs_[currentShader_]->uniformLocation("use_textures");
+            projection_location            = programs_[currentShader_]->uniformLocation("projection");
+            view_location                  = programs_[currentShader_]->uniformLocation("view");
+            model_location                 = programs_[currentShader_]->uniformLocation("model");
+            normal_matrix_location         = programs_[currentShader_]->uniformLocation("normal_matrix");
+            specular_map_location          = programs_[currentShader_]->uniformLocation("specular_map");
+            diffuse_map_location           = programs_[currentShader_]->uniformLocation("diffuse_map");
+            weighted_specular_map_location = programs_[currentShader_]->uniformLocation("weighted_specular_map");
+            brdfLUT_map_location           = programs_[currentShader_]->uniformLocation("brdfLUT_map");
+            color_map_location             = programs_[currentShader_]->uniformLocation("color_map");
+            roughness_map_location         = programs_[currentShader_]->uniformLocation("roughness_map");
+            metalness_map_location         = programs_[currentShader_]->uniformLocation("metalness_map");
+            current_text_location          = programs_[currentShader_]->uniformLocation("current_texture");
+            fresnel_location               = programs_[currentShader_]->uniformLocation("fresnel");
+            light_location                 = programs_[currentShader_]->uniformLocation("light");
+            camera_location                = programs_[currentShader_]->uniformLocation("camera_position");
+            roughness_location             = programs_[currentShader_]->uniformLocation("roughness");
+            metalness_location             = programs_[currentShader_]->uniformLocation("metalness");
+            albedo_location                = programs_[currentShader_]->uniformLocation("albedo");
+            use_textures_location          = programs_[currentShader_]->uniformLocation("use_textures");
 
             // Model, View, Projection and Normal matrices
             glUniformMatrix4fv(projection_location, 1, GL_FALSE, &projection[0][0]);
@@ -577,6 +608,11 @@ void GLWidget::paintGL ()
             glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_CUBE_MAP, diffuse_map_);
             glUniform1i(diffuse_map_location, 1);
+
+            // Weighted Specular CubeMap
+            glActiveTexture(GL_TEXTURE6);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, weighted_specular_map_);
+            glUniform1i(weighted_specular_map_location, 6);
 
             // BRDF LUT Texture
             glActiveTexture(GL_TEXTURE2);
