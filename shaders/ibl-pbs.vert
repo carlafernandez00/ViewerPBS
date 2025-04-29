@@ -11,9 +11,11 @@ uniform mat3 normal_matrix;
 
 out vec3 v_normal;
 out vec3 v_world_position;
+out vec2 v_uv;
 
 void main(void)  {
-    v_normal = normal; // normal in world space
+    v_normal = normal;  // normal in world space
+    v_uv = texCoord;    // texture coordinates
      
     v_world_position = vec3(model * vec4( vert, 1.0f ));               // position of the vertex in world space
     gl_Position = projection * view * vec4(v_world_position, 1.0f);    // position of the vertex in clip space
