@@ -4,6 +4,7 @@ in vec3 v_world_position;
 
 uniform vec3 light;             // Light position
 uniform vec3 camera_position;   // Camera position
+uniform bool gamma_correction;
 
 // Material Properties
 uniform vec3 fresnel;           // F0: Frenel 
@@ -60,6 +61,11 @@ void main (void) {
 
     vec3 color = compute_light(normal, reflect_dir, view_dir);
     
+    // Gamma correction
+    if (gamma_correction) {
+        color = pow(color, vec3(1.0 / 2.2));
+    }
+
     frag_color = vec4(color, 1.0);
 }
 

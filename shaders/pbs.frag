@@ -8,6 +8,7 @@ uniform vec3 camera_position;  // Camera position
 
 // Material Properties
 uniform bool use_textures;
+uniform bool gamma_correction;
 uniform vec3 fresnel;          // F0: Frenel 
 
 // Global Values
@@ -118,6 +119,11 @@ void main (void) {
 
     vec3 color = ambient_light * material_albedo;
     color += total_light;
-    
+
+    // Gamma correction
+    if (gamma_correction) {
+        color = pow(color, vec3(1.0 / 2.2));
+    }
+
     frag_color = vec4(color, 1.0);
 }

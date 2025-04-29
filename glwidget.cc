@@ -148,7 +148,8 @@ GLWidget::GLWidget(QWidget *parent)
       metalness_(0),
       roughness_(0),
       albedo_(1.0, 1.0, 1.0),
-      useTextures_(false)
+      useTextures_(false),
+      applyGammaCorrection_(false)
       {
   setFocusPolicy(Qt::StrongFocus);
 }
@@ -567,31 +568,32 @@ void GLWidget::paintGL ()
             normal_matrix_location, specular_map_location, diffuse_map_location, brdfLUT_map_location,
             weighted_specular_map_location, fresnel_location, color_map_location, roughness_map_location, metalness_map_location,
             current_text_location, light_location, camera_location, roughness_location, metalness_location, 
-            use_textures_location, albedo_location;
+            use_textures_location, apply_gamma_correction_location, albedo_location;
 
             //MESH-----------------------------------------------------------------------------------------
             //general shader setting
             programs_[currentShader_]->bind();
             
-            projection_location            = programs_[currentShader_]->uniformLocation("projection");
-            view_location                  = programs_[currentShader_]->uniformLocation("view");
-            model_location                 = programs_[currentShader_]->uniformLocation("model");
-            normal_matrix_location         = programs_[currentShader_]->uniformLocation("normal_matrix");
-            specular_map_location          = programs_[currentShader_]->uniformLocation("specular_map");
-            diffuse_map_location           = programs_[currentShader_]->uniformLocation("diffuse_map");
-            weighted_specular_map_location = programs_[currentShader_]->uniformLocation("weighted_specular_map");
-            brdfLUT_map_location           = programs_[currentShader_]->uniformLocation("brdfLUT_map");
-            color_map_location             = programs_[currentShader_]->uniformLocation("color_map");
-            roughness_map_location         = programs_[currentShader_]->uniformLocation("roughness_map");
-            metalness_map_location         = programs_[currentShader_]->uniformLocation("metalness_map");
-            current_text_location          = programs_[currentShader_]->uniformLocation("current_texture");
-            fresnel_location               = programs_[currentShader_]->uniformLocation("fresnel");
-            light_location                 = programs_[currentShader_]->uniformLocation("light");
-            camera_location                = programs_[currentShader_]->uniformLocation("camera_position");
-            roughness_location             = programs_[currentShader_]->uniformLocation("roughness");
-            metalness_location             = programs_[currentShader_]->uniformLocation("metalness");
-            albedo_location                = programs_[currentShader_]->uniformLocation("albedo");
-            use_textures_location          = programs_[currentShader_]->uniformLocation("use_textures");
+            projection_location             = programs_[currentShader_]->uniformLocation("projection");
+            view_location                   = programs_[currentShader_]->uniformLocation("view");
+            model_location                  = programs_[currentShader_]->uniformLocation("model");
+            normal_matrix_location          = programs_[currentShader_]->uniformLocation("normal_matrix");
+            specular_map_location           = programs_[currentShader_]->uniformLocation("specular_map");
+            diffuse_map_location            = programs_[currentShader_]->uniformLocation("diffuse_map");
+            weighted_specular_map_location  = programs_[currentShader_]->uniformLocation("weighted_specular_map");
+            brdfLUT_map_location            = programs_[currentShader_]->uniformLocation("brdfLUT_map");
+            color_map_location              = programs_[currentShader_]->uniformLocation("color_map");
+            roughness_map_location          = programs_[currentShader_]->uniformLocation("roughness_map");
+            metalness_map_location          = programs_[currentShader_]->uniformLocation("metalness_map");
+            current_text_location           = programs_[currentShader_]->uniformLocation("current_texture");
+            fresnel_location                = programs_[currentShader_]->uniformLocation("fresnel");
+            light_location                  = programs_[currentShader_]->uniformLocation("light");
+            camera_location                 = programs_[currentShader_]->uniformLocation("camera_position");
+            roughness_location              = programs_[currentShader_]->uniformLocation("roughness");
+            metalness_location              = programs_[currentShader_]->uniformLocation("metalness");
+            albedo_location                 = programs_[currentShader_]->uniformLocation("albedo");
+            use_textures_location           = programs_[currentShader_]->uniformLocation("use_textures");
+            apply_gamma_correction_location = programs_[currentShader_]->uniformLocation("apply_gamma_correction");
 
             // Model, View, Projection and Normal matrices
             glUniformMatrix4fv(projection_location, 1, GL_FALSE, &projection[0][0]);
@@ -643,6 +645,7 @@ void GLWidget::paintGL ()
             glUniform1f(metalness_location, metalness_);
             glUniform3f(albedo_location, albedo_[0], albedo_[1], albedo_[2]);
             glUniform1i(use_textures_location, useTextures_ ? 1 : 0);
+            glUniform1i(apply_gamma_correction_location, applyGammaCorrection_ ? 1 : 0);
 
             // Bind the VAO and draw the elements
             glBindVertexArray(VAO);
@@ -737,6 +740,11 @@ void GLWidget::SetAlbedo(double r, double g, double b) {
 
 void GLWidget::SetUseTextures(bool use) {
     useTextures_ = use;
+    update();
+}
+
+void GLWidget::ApplyGammaCorrection(bool apply) {
+    applyGammaCorrection_ = apply;
     update();
 }
 

@@ -52,7 +52,7 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    * @return Whether it was able to load the textures.
    */
   bool LoadWeightedSpecularMap(const QString &filename);
-  
+
   /**
    * @brief LoadDiffuseMap Will load load a cube map that will be used for the
    * diffuse component.
@@ -225,6 +225,11 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    */
   bool useTextures_;
 
+  /**
+   * @brief applyGammaCorrection_ Indicates whether to apply gamma correction or not
+   */
+  bool applyGammaCorrection_;
+
 
   GLuint VAO;
   GLuint VBO_v;
@@ -290,6 +295,11 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    */
   void SetUseTextures(bool);
 
+  /**
+   * @brief ApplyGammaCorrection Sets whether to apply gamma correction or not.
+   */
+  void ApplyGammaCorrection(bool);
+  
   /**
    * @brief SetCurrentTexture sets the current texture to show
    */
