@@ -26,8 +26,9 @@ void main(void) {
     vec3 ambient = ambient_strength * light_color;
 
     // diffuse component
+    float diffuse_strength = 1.0f;
     float NdotL = clamp(dot(normal, light_dir), 0.0, 1.0);
-    vec3 diffuse = NdotL * light_color;
+    vec3 diffuse = diffuse_strength * NdotL * light_color;
 
     // specular component 
     float specular_strength = 1.0f;
