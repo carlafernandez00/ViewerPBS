@@ -100,12 +100,23 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    */
   void SetAlbedo(double, double, double);
 
+
  protected:
   /**
    * @brief initializeGL Initializes OpenGL variables and loads, compiles and
    * links shaders.
    */
   void initializeGL();
+
+  /**
+   * @brief LoadDefaultMaterials Loads the default materials and textures.
+   */
+  void LoadDefaultMaterials();
+
+  /**
+   * @brief InitializeSSAO Initializes the Screen Space Ambient Occlusion (SSAO) effect.
+   */
+  void InitializeSSAO();
 
   /**
    * @brief resizeGL Resizes the viewport.
@@ -169,6 +180,28 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    * @brief metalness_map_ Metalness texture.
    */
   GLuint metalness_map_;
+
+  /**
+   * @brief albedo_texture_ Albedo texture.
+   */
+  GLuint albedo_texture_;
+
+  /**
+   * @brief normal_texture_ Normal texture.
+   * This texture stores the normals of the scene for SSAO.
+   */
+  GLuint normal_texture_;
+
+  /**
+   * @brief depth_texture_ Depth texture.
+   * This texture stores the depth information of the scene for SSAO.
+   */
+  GLuint depth_texture_;
+
+  /**
+   * @brief g_buffer_FBO_ Framebuffer object for the G-Buffer used in SSAO.
+   */
+  GLuint g_buffer_FBO_;
 
   /**
    * @brief initialized_ Whether the widget has finished initializations.
@@ -245,6 +278,24 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
 
 
  protected slots:
+  /**
+   * @brief renderMesh renders the mesh with the given transformation matrices.
+   * @param model Model matrix.
+   * @param view View matrix.
+   * @param projection Projection matrix.
+   * @param normal Normal matrix.
+   */
+  void renderMesh(glm::mat4x4 model, glm::mat4x4 view, glm::mat4x4 projection, glm::mat3 normal);
+  
+  /**
+   * @brief renderSkybox renders the skybox with the given transformation matrices.
+   * @param model Model matrix.
+   * @param view View matrix.
+   * @param projection Projection matrix.
+   * @param normal Normal matrix.
+   */
+  void renderSkybox(glm::mat4x4 model, glm::mat4x4 view, glm::mat4x4 projection, glm::mat3 normal);
+  
   /**
    * @brief paintGL Function that handles rendering the scene.
    */

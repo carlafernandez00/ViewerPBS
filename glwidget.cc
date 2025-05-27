@@ -159,6 +159,16 @@ GLWidget::~GLWidget() {
     glDeleteTextures(1, &specular_map_);
     glDeleteTextures(1, &diffuse_map_);
     glDeleteTextures(1, &brdfLUT_map_);
+    glDeleteTextures(1, &color_map_);
+    glDeleteTextures(1, &roughness_map_);
+    glDeleteTextures(1, &metalness_map_);
+    glDeleteTextures(1, &weighted_specular_map_);
+
+    glDeleteFramebuffers(1, &g_buffer_FBO_);
+    glDeleteTextures(1, &albedo_texture_);
+    glDeleteTextures(1, &normal_texture_);
+    glDeleteTextures(1, &depth_texture_);
+
   }
 }
 
@@ -439,6 +449,65 @@ void GLWidget::initializeGL ()
 
   initialized_ = true;
 
+  // Initialize textures and framebuffer for SSAO (Two-step rendering)
+  InitializeSSAO();
+
+  // Load textures and cube maps
+  LoadDefaultMaterials();
+}
+
+void GLWidget::InitializeSSAO() {
+  // Generate textures and framebuffer for SSAO
+  glGenTextures(1, &albedo_texture_);
+  glGenTextures(1, &normal_texture_);
+  glGenTextures(1, &depth_texture_);
+  glGenFramebuffers(1, &g_buffer_FBO_);
+
+  // Albedo texture
+  glBindTexture(GL_TEXTURE_2D, albedo_texture_);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glBindTexture(GL_TEXTURE_2D, 0);
+
+  // Normal texture
+  glBindTexture(GL_TEXTURE_2D, normal_texture_);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glBindTexture(GL_TEXTURE_2D, 0);
+
+  // Depth texture
+  glBindTexture(GL_TEXTURE_2D, depth_texture_);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width_, height_, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glBindTexture(GL_TEXTURE_2D, 0);
+
+  // Framebuffer setup
+  glBindFramebuffer(GL_FRAMEBUFFER, g_buffer_FBO_);
+
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, albedo_texture_, 0); // Albedo to attachment 0
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, normal_texture_, 0); // Normal to attachment 1
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_texture_, 0);   // Depth to attachment 2
+
+  // Set the draw buffers to the albedo and normal textures
+  unsigned int attachments[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+  glDrawBuffers(2, attachments); 
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    std::cerr << "Error: Framebuffer is not complete!" << std::endl;
+  }
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0); 
+}
+
+void GLWidget::LoadDefaultMaterials(){
   // Initialize a Specular CubeMap
   bool specular_loaded = LoadSpecularMap("../textures/Lycksele2/sky"); 
   if (!specular_loaded) {
@@ -542,6 +611,138 @@ void GLWidget::keyPressEvent(QKeyEvent *event) {
   update();
 }
 
+void GLWidget::renderMesh(glm::mat4x4 model, glm::mat4x4 view, glm::mat4x4 projection, glm::mat3 normal)
+{
+  GLint projection_location, view_location, model_location,
+  normal_matrix_location, specular_map_location, diffuse_map_location, brdfLUT_map_location,
+  weighted_specular_map_location, fresnel_location, color_map_location, roughness_map_location, metalness_map_location,
+  current_text_location, light_location, camera_location, roughness_location, metalness_location, 
+  use_textures_location, apply_gamma_correction_location, albedo_location;
+
+  //general shader setting
+  programs_[currentShader_]->bind();
+  
+  projection_location             = programs_[currentShader_]->uniformLocation("projection");
+  view_location                   = programs_[currentShader_]->uniformLocation("view");
+  model_location                  = programs_[currentShader_]->uniformLocation("model");
+  normal_matrix_location          = programs_[currentShader_]->uniformLocation("normal_matrix");
+  specular_map_location           = programs_[currentShader_]->uniformLocation("specular_map");
+  diffuse_map_location            = programs_[currentShader_]->uniformLocation("diffuse_map");
+  weighted_specular_map_location  = programs_[currentShader_]->uniformLocation("weighted_specular_map");
+  brdfLUT_map_location            = programs_[currentShader_]->uniformLocation("brdfLUT_map");
+  color_map_location              = programs_[currentShader_]->uniformLocation("color_map");
+  roughness_map_location          = programs_[currentShader_]->uniformLocation("roughness_map");
+  metalness_map_location          = programs_[currentShader_]->uniformLocation("metalness_map");
+  current_text_location           = programs_[currentShader_]->uniformLocation("current_texture");
+  fresnel_location                = programs_[currentShader_]->uniformLocation("fresnel");
+  light_location                  = programs_[currentShader_]->uniformLocation("light");
+  camera_location                 = programs_[currentShader_]->uniformLocation("camera_position");
+  roughness_location              = programs_[currentShader_]->uniformLocation("roughness");
+  metalness_location              = programs_[currentShader_]->uniformLocation("metalness");
+  albedo_location                 = programs_[currentShader_]->uniformLocation("albedo");
+  use_textures_location           = programs_[currentShader_]->uniformLocation("use_textures");
+  apply_gamma_correction_location = programs_[currentShader_]->uniformLocation("apply_gamma_correction");
+
+  // Model, View, Projection and Normal matrices
+  glUniformMatrix4fv(projection_location, 1, GL_FALSE, &projection[0][0]);
+  glUniformMatrix4fv(view_location, 1, GL_FALSE, &view[0][0]);
+  glUniformMatrix4fv(model_location, 1, GL_FALSE, &model[0][0]);
+  glUniformMatrix3fv(normal_matrix_location, 1, GL_FALSE, &normal[0][0]);
+
+  // Specular CubeMap
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_CUBE_MAP, specular_map_);
+  glUniform1i(specular_map_location, 0);
+
+  // Diffuse CubeMap
+  glActiveTexture(GL_TEXTURE1);
+  glBindTexture(GL_TEXTURE_CUBE_MAP, diffuse_map_);
+  glUniform1i(diffuse_map_location, 1);
+
+  // Weighted Specular CubeMap
+  glActiveTexture(GL_TEXTURE6);
+  glBindTexture(GL_TEXTURE_CUBE_MAP, weighted_specular_map_);
+  glUniform1i(weighted_specular_map_location, 6);
+
+  // BRDF LUT Texture
+  glActiveTexture(GL_TEXTURE2);
+  glBindTexture(GL_TEXTURE_2D, brdfLUT_map_);
+  glUniform1i(brdfLUT_map_location, 2);
+
+  // Textures
+  // Color Map (Texture unit 3)
+  glActiveTexture(GL_TEXTURE3);
+  glBindTexture(GL_TEXTURE_2D, color_map_);
+  glUniform1i(color_map_location, 3);
+
+  // Roughness Map (Texture unit 4)
+  glActiveTexture(GL_TEXTURE4);
+  glBindTexture(GL_TEXTURE_2D, roughness_map_);
+  glUniform1i(roughness_map_location, 4);
+
+  // Metalness Map (Texture unit 5)
+  glActiveTexture(GL_TEXTURE5);
+  glBindTexture(GL_TEXTURE_2D, metalness_map_);
+  glUniform1i(metalness_map_location, 5);
+
+  glUniform1i(current_text_location, currentTexture_);
+  glUniform3f(fresnel_location, fresnel_[0], fresnel_[1], fresnel_[2]);
+  glUniform3f(light_location, 10, 0, 0);
+  glUniform3f(camera_location, camera_.GetPosition().x, camera_.GetPosition().y, camera_.GetPosition().z);
+  glUniform1f(roughness_location, roughness_);
+  glUniform1f(metalness_location, metalness_);
+  glUniform3f(albedo_location, albedo_[0], albedo_[1], albedo_[2]);
+  glUniform1i(use_textures_location, useTextures_ ? 1 : 0);
+  glUniform1i(apply_gamma_correction_location, applyGammaCorrection_ ? 1 : 0);
+
+  // Bind the VAO and draw the elements
+  glBindVertexArray(VAO);
+  glDrawElements(GL_TRIANGLES, mesh_->faces_.size(), GL_UNSIGNED_INT, (GLvoid*)0);
+  glBindVertexArray(0);
+}
+
+
+void GLWidget::renderSkybox(glm::mat4x4 model, glm::mat4x4 view, glm::mat4x4 projection, glm::mat3 normal) 
+{
+  GLint projection_location, view_location, model_location,
+  normal_matrix_location, specular_map_location;
+
+  //model = camera_.SetIdentity();
+
+  // Set depth function for skybox
+  GLint oldDepthFunc;
+  glGetIntegerv(GL_DEPTH_FUNC, &oldDepthFunc);
+  
+  glDepthFunc(GL_LEQUAL);
+
+  programs_[programs_.size()-1]->bind();
+
+  projection_location     = programs_[programs_.size()-1]->uniformLocation("projection");
+  view_location           = programs_[programs_.size()-1]->uniformLocation("view");
+  model_location          = programs_[programs_.size()-1]->uniformLocation("model");
+  normal_matrix_location  = programs_[programs_.size()-1]->uniformLocation("normal_matrix");
+  specular_map_location   = programs_[programs_.size()-1]->uniformLocation("specular_map");
+
+
+  glUniformMatrix4fv(projection_location, 1, GL_FALSE, &projection[0][0]);
+  glUniformMatrix4fv(view_location, 1, GL_FALSE, &view[0][0]);
+  glUniformMatrix4fv(model_location, 1, GL_FALSE, &model[0][0]);
+  glUniformMatrix3fv(normal_matrix_location, 1, GL_FALSE, &normal[0][0]);
+
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_CUBE_MAP, specular_map_);
+  programs_[programs_.size() - 1]->setUniformValue("specular_map", 0);
+
+  // Bind the VAO and draw the elements
+  glBindVertexArray(VAO_sky);
+  glDrawElements(GL_TRIANGLES, skyFaces_.size(), GL_UNSIGNED_INT, (GLvoid*)0);
+  glBindVertexArray(0);
+  programs_[programs_.size() - 1]->release();
+
+  // Restore original depth function
+  glDepthFunc(oldDepthFunc);
+
+}
 
 void GLWidget::paintGL ()
 {
@@ -549,6 +750,13 @@ void GLWidget::paintGL ()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     if (initialized_) {
+        // RENDER TO THE G-BUFFER (SSAO)
+        // Bind and clear the framebuffer 
+        // glBindFramebuffer(GL_FRAMEBUFFER, g_buffer_FBO_);         
+        // glClearColor(0.0f, 0.0f, 0.0f, 1.0f);                    
+        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);       
+
+
         camera_.SetViewport();
 
         glm::mat4x4 projection = camera_.SetProjection();
@@ -564,133 +772,13 @@ void GLWidget::paintGL ()
          normal = glm::transpose(glm::inverse(normal));
 
         if (mesh_ != nullptr) {
-            GLint projection_location, view_location, model_location,
-            normal_matrix_location, specular_map_location, diffuse_map_location, brdfLUT_map_location,
-            weighted_specular_map_location, fresnel_location, color_map_location, roughness_map_location, metalness_map_location,
-            current_text_location, light_location, camera_location, roughness_location, metalness_location, 
-            use_textures_location, apply_gamma_correction_location, albedo_location;
+            renderMesh(model, view, projection, normal);
 
-            //MESH-----------------------------------------------------------------------------------------
-            //general shader setting
-            programs_[currentShader_]->bind();
-            
-            projection_location             = programs_[currentShader_]->uniformLocation("projection");
-            view_location                   = programs_[currentShader_]->uniformLocation("view");
-            model_location                  = programs_[currentShader_]->uniformLocation("model");
-            normal_matrix_location          = programs_[currentShader_]->uniformLocation("normal_matrix");
-            specular_map_location           = programs_[currentShader_]->uniformLocation("specular_map");
-            diffuse_map_location            = programs_[currentShader_]->uniformLocation("diffuse_map");
-            weighted_specular_map_location  = programs_[currentShader_]->uniformLocation("weighted_specular_map");
-            brdfLUT_map_location            = programs_[currentShader_]->uniformLocation("brdfLUT_map");
-            color_map_location              = programs_[currentShader_]->uniformLocation("color_map");
-            roughness_map_location          = programs_[currentShader_]->uniformLocation("roughness_map");
-            metalness_map_location          = programs_[currentShader_]->uniformLocation("metalness_map");
-            current_text_location           = programs_[currentShader_]->uniformLocation("current_texture");
-            fresnel_location                = programs_[currentShader_]->uniformLocation("fresnel");
-            light_location                  = programs_[currentShader_]->uniformLocation("light");
-            camera_location                 = programs_[currentShader_]->uniformLocation("camera_position");
-            roughness_location              = programs_[currentShader_]->uniformLocation("roughness");
-            metalness_location              = programs_[currentShader_]->uniformLocation("metalness");
-            albedo_location                 = programs_[currentShader_]->uniformLocation("albedo");
-            use_textures_location           = programs_[currentShader_]->uniformLocation("use_textures");
-            apply_gamma_correction_location = programs_[currentShader_]->uniformLocation("apply_gamma_correction");
-
-            // Model, View, Projection and Normal matrices
-            glUniformMatrix4fv(projection_location, 1, GL_FALSE, &projection[0][0]);
-            glUniformMatrix4fv(view_location, 1, GL_FALSE, &view[0][0]);
-            glUniformMatrix4fv(model_location, 1, GL_FALSE, &model[0][0]);
-            glUniformMatrix3fv(normal_matrix_location, 1, GL_FALSE, &normal[0][0]);
-
-            // Specular CubeMap
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_CUBE_MAP, specular_map_);
-            glUniform1i(specular_map_location, 0);
-
-            // Diffuse CubeMap
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_CUBE_MAP, diffuse_map_);
-            glUniform1i(diffuse_map_location, 1);
-
-            // Weighted Specular CubeMap
-            glActiveTexture(GL_TEXTURE6);
-            glBindTexture(GL_TEXTURE_CUBE_MAP, weighted_specular_map_);
-            glUniform1i(weighted_specular_map_location, 6);
-
-            // BRDF LUT Texture
-            glActiveTexture(GL_TEXTURE2);
-            glBindTexture(GL_TEXTURE_2D, brdfLUT_map_);
-            glUniform1i(brdfLUT_map_location, 2);
-
-            // Textures
-            // Color Map (Texture unit 3)
-            glActiveTexture(GL_TEXTURE3);
-            glBindTexture(GL_TEXTURE_2D, color_map_);
-            glUniform1i(color_map_location, 3);
-
-            // Roughness Map (Texture unit 4)
-            glActiveTexture(GL_TEXTURE4);
-            glBindTexture(GL_TEXTURE_2D, roughness_map_);
-            glUniform1i(roughness_map_location, 4);
-
-            // Metalness Map (Texture unit 5)
-            glActiveTexture(GL_TEXTURE5);
-            glBindTexture(GL_TEXTURE_2D, metalness_map_);
-            glUniform1i(metalness_map_location, 5);
-
-            glUniform1i(current_text_location, currentTexture_);
-            glUniform3f(fresnel_location, fresnel_[0], fresnel_[1], fresnel_[2]);
-            glUniform3f(light_location, 10, 0, 0);
-            glUniform3f(camera_location, camera_.GetPosition().x, camera_.GetPosition().y, camera_.GetPosition().z);
-            glUniform1f(roughness_location, roughness_);
-            glUniform1f(metalness_location, metalness_);
-            glUniform3f(albedo_location, albedo_[0], albedo_[1], albedo_[2]);
-            glUniform1i(use_textures_location, useTextures_ ? 1 : 0);
-            glUniform1i(apply_gamma_correction_location, applyGammaCorrection_ ? 1 : 0);
-
-            // Bind the VAO and draw the elements
-            glBindVertexArray(VAO);
-            glDrawElements(GL_TRIANGLES, mesh_->faces_.size(), GL_UNSIGNED_INT, (GLvoid*)0);
-            glBindVertexArray(0);
-
-
-            //SKY-----------------------------------------------------------------------------------------
             if(skyVisible_) {
-                //model = camera_.SetIdentity();
-
-                // Set depth function for skybox
-                GLint oldDepthFunc;
-                glGetIntegerv(GL_DEPTH_FUNC, &oldDepthFunc);
-                
-                glDepthFunc(GL_LEQUAL);
-
-                programs_[programs_.size()-1]->bind();
-
-                projection_location     = programs_[programs_.size()-1]->uniformLocation("projection");
-                view_location           = programs_[programs_.size()-1]->uniformLocation("view");
-                model_location          = programs_[programs_.size()-1]->uniformLocation("model");
-                normal_matrix_location  = programs_[programs_.size()-1]->uniformLocation("normal_matrix");
-                specular_map_location   = programs_[programs_.size()-1]->uniformLocation("specular_map");
-    
-
-                glUniformMatrix4fv(projection_location, 1, GL_FALSE, &projection[0][0]);
-                glUniformMatrix4fv(view_location, 1, GL_FALSE, &view[0][0]);
-                glUniformMatrix4fv(model_location, 1, GL_FALSE, &model[0][0]);
-                glUniformMatrix3fv(normal_matrix_location, 1, GL_FALSE, &normal[0][0]);
-
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_CUBE_MAP, specular_map_);
-                programs_[programs_.size() - 1]->setUniformValue("specular_map", 0);
-
-                // Bind the VAO and draw the elements
-                glBindVertexArray(VAO_sky);
-                glDrawElements(GL_TRIANGLES, skyFaces_.size(), GL_UNSIGNED_INT, (GLvoid*)0);
-                glBindVertexArray(0);
-                programs_[programs_.size() - 1]->release();
-
-                // Restore original depth function
-                glDepthFunc(oldDepthFunc);
+                renderSkybox(model, view, projection, normal);
             }
         }
+
     }
 }
 
