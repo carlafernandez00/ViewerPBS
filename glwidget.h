@@ -137,6 +137,16 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
   std::vector<std::unique_ptr<QOpenGLShaderProgram>> programs_;
 
   /**
+   * @brief gbuffer_program_ Program used for the G-Buffer pass in SSAO.
+   */
+  std::unique_ptr<QOpenGLShaderProgram> gbuffer_program_;
+
+  /**
+   * @brief second_pass_program_ Program used for the second pass in SSAO.
+   */
+  std::unique_ptr<QOpenGLShaderProgram> second_pass_program_;
+
+  /**
    * @brief camera_ Class that computes the multiple camera transform matrices.
    */
   data_visualization::Camera camera_;
@@ -209,6 +219,11 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
   bool initialized_;
 
   /**
+   * @brief SSAO_enabled_ Whether the SSAO effect is enabled.
+   */
+  bool SSAO_enabled_;
+
+  /**
    * @brief width_ Viewport current width.
    */
   float width_;
@@ -232,6 +247,11 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    * @brief currentTexture_ Indicates the visible texture in texture mapping
    */
   int currentTexture_;
+
+  /**
+   * @brief currentSSAORenderMode_ Indicates the current SSAO render mode
+   */
+  int currentSSAORenderMode_;
 
   /**
    * @brief currentTexture_ Indicates the visible texture in texture mapping
@@ -276,6 +296,8 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
   std::vector<float> skyVertices_;
   std::vector<int> skyFaces_;
 
+  GLuint quad_VAO;
+  GLuint quad_VBO;
 
  protected slots:
   /**
@@ -300,6 +322,16 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    * @brief paintGL Function that handles rendering the scene.
    */
   void paintGL();
+
+  /**
+   * @brief renderDefault Renders the scene with the default shader.
+   */
+  void renderDefault();
+
+  /**
+   * @brief renderWithSSAO Renders the scene with the SSAO effect.
+   */
+  void renderWithSSAO();
 
   /**
    * @brief SetReflection Enables the reflection shader.

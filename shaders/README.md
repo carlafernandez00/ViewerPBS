@@ -61,6 +61,7 @@ If you're using macOS, after building the application, you need to set up a symb
 cd release/ViewerPBS.app/Contents/MacOS
 ln -s ../../../shaders ../shaders
 ln -s ../../../textures ../textures
+ln -s ../../../models ../models
 ```
 
 This ensures that the application can find the shader files when running on macOS.

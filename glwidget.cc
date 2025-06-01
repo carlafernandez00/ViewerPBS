@@ -28,6 +28,12 @@ const std::vector<std::vector<std::string>> kShaderFiles = {
                 {"../shaders/sky.vert",          "../shaders/sky.frag"}};//sky needs to be the last one
 
 
+const std::vector<std::string> kGBufferShaderFiles = {
+    "../shaders/gbuffer.vert", "../shaders/gbuffer.frag"
+};
+const std::vector<std::string> kSecondPassShaderFiles = {
+    "../shaders/second_pass.vert", "../shaders/second_pass.frag"
+};
 
 const int kVertexAttributeIdx = 0;
 const int kNormalAttributeIdx = 1;
@@ -65,6 +71,19 @@ unsigned int kSkyFaces[36] = {
   // Right
   1, 3, 7,
   7, 5, 1
+};
+
+float quadVertices[] = {
+    // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
+    // NOTE that this plane is now much smaller and at the top of the screen
+    // positions   // texCoords
+    -1.0f,  1.0f,  0.0f, 1.0f,
+    -1.0f, -1.0f,  0.0f, 0.0f,
+     1.0f, -1.0f,  1.0f, 0.0f,
+
+    -1.0f,  1.0f,  0.0f, 1.0f,
+     1.0f, -1.0f,  1.0f, 0.0f,
+     1.0f,  1.0f,  1.0f, 1.0f
 };
 
 bool ReadFile(const std::string filename, std::string *shader_source) {
@@ -139,10 +158,12 @@ bool LoadProgram(const std::string &vertex, const std::string &fragment,
 GLWidget::GLWidget(QWidget *parent)
     : QOpenGLWidget(parent),
       initialized_(false),
+      SSAO_enabled_(true),
       width_(0.0),
       height_(0.0),
       currentShader_(0),
       currentTexture_(0),
+      currentSSAORenderMode_(0),
       fresnel_(0.2, 0.2, 0.2),
       skyVisible_(true),
       metalness_(0),
@@ -412,6 +433,16 @@ void GLWidget::initializeGL ()
   // Cal inicialitzar l'ús de les funcions d'OpenGL
   initializeOpenGLFunctions();
 
+  // Add this to check OpenGL version
+  const GLubyte* renderer = glGetString(GL_RENDERER);
+  const GLubyte* version = glGetString(GL_VERSION);
+  const GLubyte* glslVersion = glGetString(GL_SHADING_LANGUAGE_VERSION);
+  
+  std::cout << "Renderer: " << renderer << std::endl;
+  std::cout << "OpenGL version: " << version << std::endl;
+  std::cout << "GLSL version: " << glslVersion << std::endl;
+    
+
   //initializing opengl state
   glEnable(GL_NORMALIZE);
   glDisable(GL_CULL_FACE);
@@ -426,6 +457,9 @@ void GLWidget::initializeGL ()
   glGenTextures(1, &color_map_);
   glGenTextures(1, &roughness_map_);
   glGenTextures(1, &metalness_map_);
+  glGenTextures(1, &albedo_texture_);
+  glGenTextures(1, &normal_texture_);
+  glGenTextures(1, &depth_texture_);
 
   //create shader programs
   programs_.push_back(std::make_unique<QOpenGLShaderProgram>());//phong
@@ -445,66 +479,95 @@ void GLWidget::initializeGL ()
 
   if (!res) exit(0);
 
-  LoadModel(".null");//create an sphere
+  // Load SSAO shaders
+  gbuffer_program_ = std::make_unique<QOpenGLShaderProgram>();
+  res = LoadProgram(kGBufferShaderFiles[0], kGBufferShaderFiles[1], gbuffer_program_.get());
+  if (!res) {
+    std::cerr << "Error loading G-Buffer shader." << std::endl;
+    exit(0);
+  }
 
-  initialized_ = true;
+  second_pass_program_ = std::make_unique<QOpenGLShaderProgram>();
+  res = LoadProgram(kSecondPassShaderFiles[0], kSecondPassShaderFiles[1], second_pass_program_.get());
+  if (!res) {
+    std::cerr << "Error loading Second Pass shader." << std::endl;
+    exit(0);
+  }
 
-  // Initialize textures and framebuffer for SSAO (Two-step rendering)
-  InitializeSSAO();
+  LoadModel(".null"); // Load a sphere as default model
+  // LoadModel("../models/dragon_vrip.ply");
 
   // Load textures and cube maps
   LoadDefaultMaterials();
+
+  InitializeSSAO();
+  initialized_ = true;
 }
 
 void GLWidget::InitializeSSAO() {
-  // Generate textures and framebuffer for SSAO
+  GLint scrWidth = 600;
+  GLint scrHeight = 600;
+
+  // generate textures where info will be stored
   glGenTextures(1, &albedo_texture_);
-  glGenTextures(1, &normal_texture_);
-  glGenTextures(1, &depth_texture_);
-  glGenFramebuffers(1, &g_buffer_FBO_);
-
-  // Albedo texture
   glBindTexture(GL_TEXTURE_2D, albedo_texture_);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glBindTexture(GL_TEXTURE_2D, 0);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, scrWidth, scrHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-  // Normal texture
+  glGenTextures(1, &normal_texture_);
   glBindTexture(GL_TEXTURE_2D, normal_texture_);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width_, height_, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glBindTexture(GL_TEXTURE_2D, 0);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, scrWidth, scrHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-  // Depth texture
+  glGenTextures(1, &depth_texture_);
   glBindTexture(GL_TEXTURE_2D, depth_texture_);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width_, height_, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glBindTexture(GL_TEXTURE_2D, 0);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, scrWidth, scrHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-  // Framebuffer setup
+  // Generate the G-Buffer FBO to attach the textures
+  glGenFramebuffers(1, &g_buffer_FBO_);
   glBindFramebuffer(GL_FRAMEBUFFER, g_buffer_FBO_);
 
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, albedo_texture_, 0); // Albedo to attachment 0
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, normal_texture_, 0); // Normal to attachment 1
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_texture_, 0);   // Depth to attachment 2
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, albedo_texture_, 0);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, normal_texture_, 0);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_texture_, 0);
 
-  // Set the draw buffers to the albedo and normal textures
-  unsigned int attachments[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-  glDrawBuffers(2, attachments); 
-  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-    std::cerr << "Error: Framebuffer is not complete!" << std::endl;
+  // define the array of color buffers where the fragment shader will draw into
+  GLenum drawBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+  glDrawBuffers(2, drawBuffers); // set the list of draw buffers.
+
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+      qDebug() << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!";
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  // Generate VAO and VBO to render the quad
+  glGenVertexArrays(1, &quad_VAO);
+  glBindVertexArray(quad_VAO);
+
+  glGenBuffers(1, &quad_VBO);
+  glBindBuffer(GL_ARRAY_BUFFER, quad_VBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+  glEnableVertexAttribArray(2);
+  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+  
+  glBindVertexArray(0);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+  // check errors
+  GLenum error = glGetError();
+  if (error != GL_NO_ERROR) {
+      std::cerr << "OpenGL error at line " << __LINE__ << ": " << error << std::endl;
   }
-
-  glBindFramebuffer(GL_FRAMEBUFFER, 0); 
 }
 
 void GLWidget::LoadDefaultMaterials(){
@@ -744,19 +807,12 @@ void GLWidget::renderSkybox(glm::mat4x4 model, glm::mat4x4 view, glm::mat4x4 pro
 
 }
 
-void GLWidget::paintGL ()
+void GLWidget::renderDefault ()
 {
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     if (initialized_) {
-        // RENDER TO THE G-BUFFER (SSAO)
-        // Bind and clear the framebuffer 
-        // glBindFramebuffer(GL_FRAMEBUFFER, g_buffer_FBO_);         
-        // glClearColor(0.0f, 0.0f, 0.0f, 1.0f);                    
-        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);       
-
-
         camera_.SetViewport();
 
         glm::mat4x4 projection = camera_.SetProjection();
@@ -780,6 +836,111 @@ void GLWidget::paintGL ()
         }
 
     }
+}
+
+void GLWidget::renderWithSSAO ()
+{
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    if (initialized_) {
+      camera_.SetViewport();
+
+      glm::mat4x4 projection = camera_.SetProjection();
+      glm::mat4x4 view = camera_.SetView();
+      glm::mat4x4 model = camera_.SetModel();
+
+      //compute normal matrix
+      glm::mat4x4 t = view * model;
+      glm::mat3x3 normal;
+      for (int i = 0; i < 3; ++i)
+          for (int j = 0; j < 3; ++j)
+              normal[i][j] = t[i][j];
+      normal = glm::transpose(glm::inverse(normal));
+
+      // Activate Textures
+      glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, albedo_texture_);
+      glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, normal_texture_);
+      glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, depth_texture_);
+
+      // FIRST PASS: G-Buffer generation
+      glBindFramebuffer(GL_FRAMEBUFFER, g_buffer_FBO_);
+      glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+      if (mesh_ != nullptr) {
+          GLint projection_location, view_location, model_location, normal_matrix_location;
+
+          gbuffer_program_->bind();
+
+          projection_location     = gbuffer_program_->uniformLocation("projection");
+          view_location           = gbuffer_program_->uniformLocation("view");
+          model_location          = gbuffer_program_->uniformLocation("model");
+          normal_matrix_location  = gbuffer_program_->uniformLocation("normal_matrix");
+
+          glUniformMatrix4fv(projection_location, 1, GL_FALSE, &projection[0][0]);
+          glUniformMatrix4fv(view_location, 1, GL_FALSE, &view[0][0]);
+          glUniformMatrix4fv(model_location, 1, GL_FALSE, &model[0][0]);
+          glUniformMatrix3fv(normal_matrix_location, 1, GL_FALSE, &normal[0][0]);
+
+          glBindVertexArray(VAO);
+          glDrawElements(GL_TRIANGLES, mesh_->faces_.size(), GL_UNSIGNED_INT, (GLvoid*)0);
+          glBindVertexArray(0);
+      }
+
+      // FINAL STEP: Render to the screen
+      GLuint albedo_texture_location, normal_texture_location, depth_texture_location, ssao_render_mode_location;
+      GLenum error = glGetError();
+        if (error != GL_NO_ERROR) {
+            std::cerr << "OpenGL error before binding framebuffer: " << error << std::endl;
+        }
+
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      error = glGetError();
+        if (error != GL_NO_ERROR) {
+            std::cerr << "OpenGL error after binding framebuffer: " << error << std::endl;
+        }
+
+      second_pass_program_->bind();
+      albedo_texture_location    = second_pass_program_->uniformLocation("albedo_texture");
+      normal_texture_location    = second_pass_program_->uniformLocation("normal_texture");
+      depth_texture_location     = second_pass_program_->uniformLocation("depth_texture");
+      ssao_render_mode_location  = second_pass_program_->uniformLocation("ssao_render_mode");
+
+      glUniform1i(albedo_texture_location, 0);   // albedo texture
+      glUniform1i(normal_texture_location, 1);   // normal texture
+      glUniform1i(depth_texture_location, 2);    // depth texture
+      glUniform1i(ssao_render_mode_location, 2);
+      
+      error = glGetError();
+        if (error != GL_NO_ERROR) {
+            std::cerr << "OpenGL error before quad rendering: " << error << std::endl;
+        }
+      
+      glBindVertexArray(quad_VAO);
+      glDrawArrays(GL_TRIANGLES, 0, 6);
+
+      // Check for errors after quad rendering
+      error = glGetError();
+      if (error != GL_NO_ERROR) {
+          std::cerr << "OpenGL error after quad rendering: " << error << std::endl;
+      }
+
+      glBindVertexArray(0);
+    }
+
+}
+
+void GLWidget::paintGL ()
+{
+  if (SSAO_enabled_) {
+      renderWithSSAO();
+  }
+  else {
+    renderDefault();
+  }
 }
 
 void GLWidget::SetReflection(bool set) {
