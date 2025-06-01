@@ -444,7 +444,7 @@ void GLWidget::initializeGL ()
     
 
   //initializing opengl state
-  glEnable(GL_NORMALIZE);
+  // glEnable(GL_NORMALIZE); // Deprecated in core profile, causes GL_INVALID_ENUM on macOS
   glDisable(GL_CULL_FACE);
   glCullFace(GL_BACK);
   glEnable(GL_DEPTH_TEST);
@@ -504,32 +504,61 @@ void GLWidget::initializeGL ()
   initialized_ = true;
 }
 
+// Helper to print framebuffer status as string
+static const char* fbStatusString(GLenum status) {
+    switch (status) {
+        case GL_FRAMEBUFFER_COMPLETE: return "GL_FRAMEBUFFER_COMPLETE";
+        case GL_FRAMEBUFFER_UNDEFINED: return "GL_FRAMEBUFFER_UNDEFINED";
+        case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT: return "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT";
+        case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: return "GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT";
+        case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER: return "GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER";
+        case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER: return "GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER";
+        case GL_FRAMEBUFFER_UNSUPPORTED: return "GL_FRAMEBUFFER_UNSUPPORTED";
+        case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE: return "GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE";
+        case GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS: return "GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS";
+        default: return "Unknown";
+    }
+}
+
 void GLWidget::InitializeSSAO() {
-  GLint scrWidth = 600;
-  GLint scrHeight = 600;
+  // Use actual widget size for G-buffer textures
+  GLint scrWidth = static_cast<GLint>(width_ > 0 ? width_ : 600);
+  GLint scrHeight = static_cast<GLint>(height_ > 0 ? height_ : 600);
+
+  // Clean up previous FBO/textures if they exist
+  if (g_buffer_FBO_) glDeleteFramebuffers(1, &g_buffer_FBO_);
+  if (albedo_texture_) glDeleteTextures(1, &albedo_texture_);
+  if (normal_texture_) glDeleteTextures(1, &normal_texture_);
+  if (depth_texture_) glDeleteTextures(1, &depth_texture_);
 
   // generate textures where info will be stored
   glGenTextures(1, &albedo_texture_);
   glBindTexture(GL_TEXTURE_2D, albedo_texture_);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, scrWidth, scrHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, scrWidth, scrHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
   glGenTextures(1, &normal_texture_);
   glBindTexture(GL_TEXTURE_2D, normal_texture_);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, scrWidth, scrHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, scrWidth, scrHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
   glGenTextures(1, &depth_texture_);
   glBindTexture(GL_TEXTURE_2D, depth_texture_);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, scrWidth, scrHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, scrWidth, scrHeight, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  GLenum depthError = glGetError();
+  if (depthError != GL_NO_ERROR) {
+      std::cerr << "OpenGL error after depth texture creation: " << depthError << std::endl;
+  }
 
   // Generate the G-Buffer FBO to attach the textures
   glGenFramebuffers(1, &g_buffer_FBO_);
@@ -539,29 +568,38 @@ void GLWidget::InitializeSSAO() {
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, normal_texture_, 0);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_texture_, 0);
 
-  // define the array of color buffers where the fragment shader will draw into
   GLenum drawBuffers[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-  glDrawBuffers(2, drawBuffers); // set the list of draw buffers.
+  glDrawBuffers(2, drawBuffers);
 
-  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-      qDebug() << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!";
+  // Print FBO status and texture IDs for debugging
+  GLenum fbStatus2 = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+  std::cerr << "[InitializeSSAO] FBO status after glDrawBuffers: 0x" << std::hex << fbStatus2 << " (" << fbStatusString(fbStatus2) << ")" << std::endl;
+  std::cerr << "[InitializeSSAO] albedo_texture_=" << albedo_texture_ << ", normal_texture_=" << normal_texture_ << std::endl;
+
+  GLenum fbStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+  if (fbStatus != GL_FRAMEBUFFER_COMPLETE) {
+      qDebug() << "ERROR::FRAMEBUFFER:: Framebuffer is not complete! Status:" << fbStatus << fbStatusString(fbStatus);
+      std::cerr << "ERROR::FRAMEBUFFER:: Framebuffer is not complete! Status: 0x" << std::hex << fbStatus << " (" << fbStatusString(fbStatus) << ")" << std::endl;
+  }
 
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-  // Generate VAO and VBO to render the quad
-  glGenVertexArrays(1, &quad_VAO);
-  glBindVertexArray(quad_VAO);
-
-  glGenBuffers(1, &quad_VBO);
-  glBindBuffer(GL_ARRAY_BUFFER, quad_VBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-  glEnableVertexAttribArray(0);
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-  glEnableVertexAttribArray(2);
-  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-  
-  glBindVertexArray(0);
-  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  // Generate VAO and VBO to render the quad (only once)
+  static bool quad_initialized = false;
+  if (!quad_initialized) {
+    glGenVertexArrays(1, &quad_VAO);
+    glBindVertexArray(quad_VAO);
+    glGenBuffers(1, &quad_VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, quad_VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    quad_initialized = true;
+    }
 
   // check errors
   GLenum error = glGetError();
@@ -621,6 +659,7 @@ void GLWidget::resizeGL (int w, int h)
 
     camera_.SetViewport(0, 0, w, h);
     camera_.SetProjection(kFieldOfView, kZNear, kZFar);
+    InitializeSSAO(); // Ensure G-buffer matches window size
 }
 
 void GLWidget::mousePressEvent(QMouseEvent *event) {
@@ -865,6 +904,11 @@ void GLWidget::renderWithSSAO ()
 
       // FIRST PASS: G-Buffer generation
       glBindFramebuffer(GL_FRAMEBUFFER, g_buffer_FBO_);
+      // Check framebuffer status after binding
+      GLenum fbStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+      if (fbStatus != GL_FRAMEBUFFER_COMPLETE) {
+          std::cerr << "[renderWithSSAO] FBO incomplete! Status: 0x" << std::hex << fbStatus << " (" << fbStatusString(fbStatus) << ")" << std::endl;
+      }
       glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -895,7 +939,13 @@ void GLWidget::renderWithSSAO ()
             std::cerr << "OpenGL error before binding framebuffer: " << error << std::endl;
         }
 
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      // Use Qt's default framebuffer for the window (required for macOS/Metal)
+      glBindFramebuffer(GL_FRAMEBUFFER, QOpenGLContext::currentContext()->defaultFramebufferObject());
+      // Check default framebuffer completeness (should always be complete, but check for debugging)
+      GLenum fbStatusDefault = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+      if (fbStatusDefault != GL_FRAMEBUFFER_COMPLETE) {
+          std::cerr << "[renderWithSSAO] Default framebuffer incomplete! Status: 0x" << std::hex << fbStatusDefault << " (" << fbStatusString(fbStatusDefault) << ")" << std::endl;
+      }
       glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       error = glGetError();
@@ -912,7 +962,7 @@ void GLWidget::renderWithSSAO ()
       glUniform1i(albedo_texture_location, 0);   // albedo texture
       glUniform1i(normal_texture_location, 1);   // normal texture
       glUniform1i(depth_texture_location, 2);    // depth texture
-      glUniform1i(ssao_render_mode_location, 2);
+      glUniform1i(ssao_render_mode_location, 0); // Show normal buffer visualization
       
       error = glGetError();
         if (error != GL_NO_ERROR) {
@@ -930,7 +980,6 @@ void GLWidget::renderWithSSAO ()
 
       glBindVertexArray(0);
     }
-
 }
 
 void GLWidget::paintGL ()
