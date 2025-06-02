@@ -5,6 +5,7 @@ in vec2 v_uv;
 // Input textures
 uniform sampler2D normal_texture;
 uniform sampler2D depth_texture;
+uniform sampler2D noise_texture;
 
 // SSAO parameters
 uniform int num_directions;
@@ -12,13 +13,15 @@ uniform int samples_per_direction;
 uniform float sample_radius;
 uniform mat4 projection;
 uniform vec2 viewport_size;
+uniform vec2 noise_scale;
 
 // Camera parameters
 uniform float zNear;
 uniform float zFar;
 uniform float fov;
 
-// Bias to reduce tangent surface artifacts
+// Randomization controls
+uniform bool use_randomization;
 uniform float bias_angle;
 
 out vec4 frag_color;
@@ -46,10 +49,31 @@ vec3 reconstructPosition(vec2 texCoord, float depth) {
     return pos_eye;
 }
 
-// Simple SSAO calculation using circular kernel (NO RANDOMIZATION)
+// Simple noise function for fallback
+float simpleNoise(vec2 co) {
+    return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+// Get random rotation angle for this pixel
+float getRandomRotation(vec2 texCoord) {
+    if (use_randomization) {
+        // Sample noise texture for rotation angle
+        vec2 noiseCoord = texCoord * noise_scale;
+        vec3 noise = texture(noise_texture, noiseCoord).xyz;
+        // Use red channel for rotation angle
+        return noise.r * 2.0 * PI;
+    } else {
+        return 0.0; // No randomization
+    }
+}
+
+// SSAO calculation 
 float calculateSSAO(vec2 texCoord, vec3 position, vec3 normal) {
     float occlusion = 0.0;
     int total_samples = 0;
+    
+    // Get random rotation for this pixel
+    float randomRotation = getRandomRotation(texCoord);
     
     // Convert sample radius from world space to screen space
     vec4 offset = vec4(sample_radius, 0.0, position.z, 1.0);
@@ -57,15 +81,28 @@ float calculateSSAO(vec2 texCoord, vec3 position, vec3 normal) {
     float radius_screen = offset.x / offset.w;
     radius_screen = abs(radius_screen);
     
-    // Fixed circular sampling pattern (no randomization)
+    // Circular sampling pattern with optional randomization
     for (int dir = 0; dir < num_directions; dir++) {
-        // Fixed angle based on direction index
-        float angle = (float(dir) / float(num_directions)) * 2.0 * PI;
+        // Base angle for this direction
+        float base_angle = (float(dir) / float(num_directions)) * 2.0 * PI;
+        
+        // Add random rotation to reduce banding
+        float angle = base_angle + randomRotation;
+        
         vec2 direction = vec2(cos(angle), sin(angle));
         
         for (int sample_idx = 1; sample_idx <= samples_per_direction; sample_idx++) {
-            // Calculate sample position in screen space
-            float distance = (float(sample_idx) / float(samples_per_direction)) * radius_screen;
+            // Calculate sample distance with optional jittering
+            float base_distance = (float(sample_idx) / float(samples_per_direction)) * radius_screen;
+            
+            float distance = base_distance;
+            if (use_randomization) {
+                // Add slight jittering to sample distance to reduce regular patterns
+                vec2 jitterCoord = texCoord + vec2(float(dir), float(sample_idx)) * 0.01;
+                float jitter = simpleNoise(jitterCoord) * 0.2 - 0.1; // ±10% jitter
+                distance = base_distance * (1.0 + jitter);
+            }
+            
             vec2 sample_coord = texCoord + direction * distance;
             
             // Check bounds - skip samples outside screen

@@ -181,7 +181,7 @@ GLWidget::GLWidget(QWidget *parent)
       ssao_num_directions_(16),
       ssao_samples_per_direction_(4),
       ssao_sample_radius_(0.5f),
-      use_randomization_(false),
+      use_randomization_(true),
       use_blur_(true),
       blur_type_(2),            // Bilateral blur
       blur_radius_(2.0f),
