@@ -30,16 +30,18 @@ vec4 simpleBlur() {
     vec4 result = vec4(0.0);
     float total_weight = 0.0;
     
+    // sample a square area around the pixel
     int radius = int(blur_radius);
     for (int x = -radius; x <= radius; x++) {
         for (int y = -radius; y <= radius; y++) {
             vec2 offset = vec2(float(x), float(y)) * texel_size;
             vec2 sample_coord = v_uv + offset;
             
+            // boundary check
             if (sample_coord.x >= 0.0 && sample_coord.x <= 1.0 && 
                 sample_coord.y >= 0.0 && sample_coord.y <= 1.0) {
                 result += texture(ssao_texture, sample_coord);
-                total_weight += 1.0;
+                total_weight += 1.0; // each sample has equal weight
             }
         }
     }
@@ -61,9 +63,11 @@ vec4 gaussianBlur() {
             vec2 offset = vec2(float(x), float(y)) * texel_size;
             vec2 sample_coord = v_uv + offset;
             
+            // boundary check
             if (sample_coord.x >= 0.0 && sample_coord.x <= 1.0 && 
                 sample_coord.y >= 0.0 && sample_coord.y <= 1.0) {
                 
+                // distance from center for gaussian weight
                 float distance = length(vec2(float(x), float(y)));
                 float weight = gaussian(distance, sigma);
                 
@@ -94,26 +98,30 @@ vec4 bilateralBlur() {
             vec2 offset = vec2(float(x), float(y)) * texel_size;
             vec2 sample_coord = v_uv + offset;
             
+            // Check if the sample coordinate is within bounds
             if (sample_coord.x >= 0.0 && sample_coord.x <= 1.0 && 
                 sample_coord.y >= 0.0 && sample_coord.y <= 1.0) {
                 
+                // Sample neighboring SSAO, normal, and depth
                 vec4 sample_ssao = texture(ssao_texture, sample_coord);
                 vec3 sample_normal = texture(normal_texture, sample_coord).xyz;
                 float sample_depth = texture(depth_texture, sample_coord).r;
                 
-                // Spatial weight (Gaussian)
+                // Spatial weight (Gaussian) - based on distance from center pixel
                 float distance = length(vec2(float(x), float(y)));
                 float spatial_weight = gaussian(distance, sigma);
                 
-                // Normal similarity weight
+                // Normal similarity weight - preserve edges where surface orientation changes
+                // high weight for similar normals, low weight for different normals
                 float normal_diff = dot(center_normal, sample_normal);
                 float normal_weight = (normal_diff > normal_threshold) ? 1.0 : 0.1;
                 
-                // Depth similarity weight
+                // Depth similarity weight - preserve edges where depth changes
+                // high weight for similar depths, low weight for different depths
                 float depth_diff = abs(center_depth - sample_depth);
                 float depth_weight = (depth_diff < depth_threshold) ? 1.0 : 0.1;
-                
-                // Combined weight
+
+                // Combined weight - only blur pixels that are spatially close and geometrically similar
                 float weight = spatial_weight * normal_weight * depth_weight;
                 
                 result += sample_ssao * weight;
