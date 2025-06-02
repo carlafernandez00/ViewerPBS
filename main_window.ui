@@ -6,13 +6,13 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>828</width>
+    <width>1028</width>
     <height>698</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
-    <width>827</width>
+    <width>1027</width>
     <height>678</height>
    </size>
   </property>
@@ -28,7 +28,7 @@
   <widget class="QWidget" name="Widget">
    <property name="minimumSize">
     <size>
-     <width>827</width>
+     <width>1027</width>
      <height>0</height>
     </size>
    </property>
@@ -78,7 +78,7 @@
          </size>
         </property>
         <property name="title">
-         <string>Options</string>
+         <string>PBR Options</string>
         </property>
         <widget class="QRadioButton" name="radio_reflection">
          <property name="geometry">
@@ -514,6 +514,480 @@
       </item>
      </layout>
     </item>
+    <!-- NEW SSAO COLUMN -->
+    <item>
+     <layout class="QVBoxLayout" name="SSAOConfiguration">
+      <item>
+       <widget class="QGroupBox" name="SSAOOptions">
+        <property name="minimumSize">
+         <size>
+          <width>200</width>
+          <height>500</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>200</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="title">
+         <string>SSAO Options</string>
+        </property>
+        
+        <!-- Enable SSAO Checkbox -->
+        <widget class="QCheckBox" name="check_enable_ssao">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>30</y>
+           <width>160</width>
+           <height>23</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Enable SSAO</string>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
+         </property>
+        </widget>
+        
+        <!-- Render Mode Combo -->
+        <widget class="QLabel" name="label_render_mode">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>60</y>
+           <width>80</width>
+           <height>20</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Render Mode:</string>
+         </property>
+        </widget>
+        <widget class="QComboBox" name="combo_ssao_render_mode">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>85</y>
+           <width>160</width>
+           <height>25</height>
+          </rect>
+         </property>
+         <item>
+          <property name="text">
+           <string>Normals</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Albedo</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Depth</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>SSAO</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Blurred SSAO</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Final Composition</string>
+          </property>
+         </item>
+        </widget>
+        
+        <!-- SSAO Kernel Parameters -->
+        <widget class="QLabel" name="label_directions">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>120</y>
+           <width>80</width>
+           <height>20</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Directions:</string>
+         </property>
+        </widget>
+        <widget class="QSpinBox" name="spin_ssao_directions">
+         <property name="geometry">
+          <rect>
+           <x>110</x>
+           <y>120</y>
+           <width>70</width>
+           <height>25</height>
+          </rect>
+         </property>
+         <property name="minimum">
+          <number>4</number>
+         </property>
+         <property name="maximum">
+          <number>64</number>
+         </property>
+         <property name="value">
+          <number>32</number>
+         </property>
+        </widget>
+        
+        <widget class="QLabel" name="label_samples">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>150</y>
+           <width>80</width>
+           <height>20</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Samples:</string>
+         </property>
+        </widget>
+        <widget class="QSpinBox" name="spin_ssao_samples">
+         <property name="geometry">
+          <rect>
+           <x>110</x>
+           <y>150</y>
+           <width>70</width>
+           <height>25</height>
+          </rect>
+         </property>
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>32</number>
+         </property>
+         <property name="value">
+          <number>6</number>
+         </property>
+        </widget>
+        
+        <widget class="QLabel" name="label_radius">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>180</y>
+           <width>80</width>
+           <height>20</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Radius:</string>
+         </property>
+        </widget>
+        <widget class="QDoubleSpinBox" name="spin_ssao_radius">
+         <property name="geometry">
+          <rect>
+           <x>110</x>
+           <y>180</y>
+           <width>70</width>
+           <height>25</height>
+          </rect>
+         </property>
+         <property name="minimum">
+          <double>0.010000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>2.000000000000000</double>
+         </property>
+         <property name="singleStep">
+          <double>0.100000000000000</double>
+         </property>
+         <property name="value">
+          <double>0.500000000000000</double>
+         </property>
+        </widget>
+        
+        <!-- Randomization -->
+        <widget class="QCheckBox" name="check_use_randomization">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>210</y>
+           <width>160</width>
+           <height>23</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Use Randomization</string>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
+         </property>
+        </widget>
+        
+        <!-- Bias Angle -->
+        <widget class="QLabel" name="label_bias_angle">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>240</y>
+           <width>80</width>
+           <height>20</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Bias Angle:</string>
+         </property>
+        </widget>
+        <widget class="QDoubleSpinBox" name="spin_bias_angle">
+         <property name="geometry">
+          <rect>
+           <x>110</x>
+           <y>240</y>
+           <width>70</width>
+           <height>25</height>
+          </rect>
+         </property>
+         <property name="minimum">
+          <double>0.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>0.500000000000000</double>
+         </property>
+         <property name="singleStep">
+          <double>0.010000000000000</double>
+         </property>
+         <property name="value">
+          <double>0.100000000000000</double>
+         </property>
+        </widget>
+        
+        <!-- Blur Options -->
+        <widget class="QCheckBox" name="check_use_blur">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>270</y>
+           <width>160</width>
+           <height>23</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Use Blur</string>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
+         </property>
+        </widget>
+        
+        <widget class="QLabel" name="label_blur_type">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>300</y>
+           <width>80</width>
+           <height>20</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Blur Type:</string>
+         </property>
+        </widget>
+        <widget class="QComboBox" name="combo_blur_type">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>325</y>
+           <width>160</width>
+           <height>25</height>
+          </rect>
+         </property>
+         <item>
+          <property name="text">
+           <string>Simple</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Bilateral</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Gaussian</string>
+          </property>
+         </item>
+        </widget>
+        
+        <widget class="QLabel" name="label_blur_radius">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>355</y>
+           <width>80</width>
+           <height>20</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Blur Radius:</string>
+         </property>
+        </widget>
+        <widget class="QDoubleSpinBox" name="spin_blur_radius">
+         <property name="geometry">
+          <rect>
+           <x>110</x>
+           <y>355</y>
+           <width>70</width>
+           <height>25</height>
+          </rect>
+         </property>
+         <property name="minimum">
+          <double>1.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>10.000000000000000</double>
+         </property>
+         <property name="singleStep">
+          <double>0.500000000000000</double>
+         </property>
+         <property name="value">
+          <double>2.000000000000000</double>
+         </property>
+        </widget>
+        
+        <!-- Bilateral Blur Thresholds -->
+        <widget class="QLabel" name="label_normal_threshold">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>385</y>
+           <width>80</width>
+           <height>20</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Normal Th:</string>
+         </property>
+        </widget>
+        <widget class="QDoubleSpinBox" name="spin_normal_threshold">
+         <property name="geometry">
+          <rect>
+           <x>110</x>
+           <y>385</y>
+           <width>70</width>
+           <height>25</height>
+          </rect>
+         </property>
+         <property name="minimum">
+          <double>0.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>1.000000000000000</double>
+         </property>
+         <property name="singleStep">
+          <double>0.100000000000000</double>
+         </property>
+         <property name="value">
+          <double>0.800000000000000</double>
+         </property>
+        </widget>
+        
+        <widget class="QLabel" name="label_depth_threshold">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>415</y>
+           <width>80</width>
+           <height>20</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Depth Th:</string>
+         </property>
+        </widget>
+        <widget class="QDoubleSpinBox" name="spin_depth_threshold">
+         <property name="geometry">
+          <rect>
+           <x>110</x>
+           <y>415</y>
+           <width>70</width>
+           <height>25</height>
+          </rect>
+         </property>
+         <property name="minimum">
+          <double>0.001000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>0.100000000000000</double>
+         </property>
+         <property name="singleStep">
+          <double>0.001000000000000</double>
+         </property>
+         <property name="value">
+          <double>0.010000000000000</double>
+         </property>
+        </widget>
+        
+        <!-- AO Strength -->
+        <widget class="QLabel" name="label_ao_strength">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>445</y>
+           <width>80</width>
+           <height>20</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>AO Strength:</string>
+         </property>
+        </widget>
+        <widget class="QDoubleSpinBox" name="spin_ao_strength">
+         <property name="geometry">
+          <rect>
+           <x>110</x>
+           <y>445</y>
+           <width>70</width>
+           <height>25</height>
+          </rect>
+         </property>
+         <property name="minimum">
+          <double>0.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>2.000000000000000</double>
+         </property>
+         <property name="singleStep">
+          <double>0.100000000000000</double>
+         </property>
+         <property name="value">
+          <double>1.000000000000000</double>
+         </property>
+        </widget>
+       </widget>
+      </item>
+      <item>
+       <spacer name="SSAOSpacer">
+        <property name="orientation">
+         <enum>Qt::Vertical</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Expanding</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>40</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+     </layout>
+    </item>
    </layout>
   </widget>
   <widget class="QMenuBar" name="menuBar">
@@ -521,7 +995,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>828</width>
+     <width>1028</width>
      <height>22</height>
     </rect>
    </property>
@@ -614,7 +1088,21 @@
     <slot>SetRoughness(double)</slot>
     <slot>SetMetalness(double)</slot>
     <slot>SetAlbedo(double, double, double)</slot>
+    <slot>SetUseTextures(bool)</slot>
     <slot>ApplyGammaCorrection(bool)</slot>
+    <slot>EnableSSAO(bool)</slot>
+    <slot>SetSSAORenderMode(int)</slot>
+    <slot>SetSSAODirections(int)</slot>
+    <slot>SetSSAOSamplesPerDirection(int)</slot>
+    <slot>SetSSAORadius(double)</slot>
+    <slot>SetUseRandomization(bool)</slot>
+    <slot>SetBiasAngle(double)</slot>
+    <slot>SetUseBlur(bool)</slot>
+    <slot>SetBlurType(int)</slot>
+    <slot>SetBlurRadius(double)</slot>
+    <slot>SetNormalThreshold(double)</slot>
+    <slot>SetDepthThreshold(double)</slot>
+    <slot>SetAOStrength(double)</slot>
    </slots>
   </customwidget>
  </customwidgets>
@@ -905,6 +1393,228 @@
     <hint type="destinationlabel">
      <x>308</x>
      <y>330</y>
+    </hint>
+   </hints>
+  </connection>
+  
+  <!-- SSAO CONNECTIONS -->
+  <connection>
+   <sender>check_enable_ssao</sender>
+   <signal>clicked(bool)</signal>
+   <receiver>glwidget</receiver>
+   <slot>EnableSSAO(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>920</x>
+     <y>50</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>300</x>
+     <y>300</y>
+    </hint>
+   </hints>
+  </connection>
+  
+  <connection>
+   <sender>combo_ssao_render_mode</sender>
+   <signal>currentIndexChanged(int)</signal>
+   <receiver>glwidget</receiver>
+   <slot>SetSSAORenderMode(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>920</x>
+     <y>100</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>300</x>
+     <y>300</y>
+    </hint>
+   </hints>
+  </connection>
+  
+  <connection>
+   <sender>spin_ssao_directions</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>glwidget</receiver>
+   <slot>SetSSAODirections(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>920</x>
+     <y>130</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>300</x>
+     <y>300</y>
+    </hint>
+   </hints>
+  </connection>
+  
+  <connection>
+   <sender>spin_ssao_samples</sender>
+   <signal>valueChanged(int)</signal>
+   <receiver>glwidget</receiver>
+   <slot>SetSSAOSamplesPerDirection(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>920</x>
+     <y>160</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>300</x>
+     <y>300</y>
+    </hint>
+   </hints>
+  </connection>
+  
+  <connection>
+   <sender>spin_ssao_radius</sender>
+   <signal>valueChanged(double)</signal>
+   <receiver>glwidget</receiver>
+   <slot>SetSSAORadius(double)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>920</x>
+     <y>190</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>300</x>
+     <y>300</y>
+    </hint>
+   </hints>
+  </connection>
+  
+  <connection>
+   <sender>check_use_randomization</sender>
+   <signal>clicked(bool)</signal>
+   <receiver>glwidget</receiver>
+   <slot>SetUseRandomization(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>920</x>
+     <y>220</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>300</x>
+     <y>300</y>
+    </hint>
+   </hints>
+  </connection>
+  
+  <connection>
+   <sender>spin_bias_angle</sender>
+   <signal>valueChanged(double)</signal>
+   <receiver>glwidget</receiver>
+   <slot>SetBiasAngle(double)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>920</x>
+     <y>250</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>300</x>
+     <y>300</y>
+    </hint>
+   </hints>
+  </connection>
+  
+  <connection>
+   <sender>check_use_blur</sender>
+   <signal>clicked(bool)</signal>
+   <receiver>glwidget</receiver>
+   <slot>SetUseBlur(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>920</x>
+     <y>280</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>300</x>
+     <y>300</y>
+    </hint>
+   </hints>
+  </connection>
+  
+  <connection>
+   <sender>combo_blur_type</sender>
+   <signal>currentIndexChanged(int)</signal>
+   <receiver>glwidget</receiver>
+   <slot>SetBlurType(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>920</x>
+     <y>330</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>300</x>
+     <y>300</y>
+    </hint>
+   </hints>
+  </connection>
+  
+  <connection>
+   <sender>spin_blur_radius</sender>
+   <signal>valueChanged(double)</signal>
+   <receiver>glwidget</receiver>
+   <slot>SetBlurRadius(double)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>920</x>
+     <y>360</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>300</x>
+     <y>300</y>
+    </hint>
+   </hints>
+  </connection>
+  
+  <connection>
+   <sender>spin_normal_threshold</sender>
+   <signal>valueChanged(double)</signal>
+   <receiver>glwidget</receiver>
+   <slot>SetNormalThreshold(double)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>920</x>
+     <y>390</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>300</x>
+     <y>300</y>
+    </hint>
+   </hints>
+  </connection>
+  
+  <connection>
+   <sender>spin_depth_threshold</sender>
+   <signal>valueChanged(double)</signal>
+   <receiver>glwidget</receiver>
+   <slot>SetDepthThreshold(double)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>920</x>
+     <y>420</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>300</x>
+     <y>300</y>
+    </hint>
+   </hints>
+  </connection>
+  
+  <connection>
+   <sender>spin_ao_strength</sender>
+   <signal>valueChanged(double)</signal>
+   <receiver>glwidget</receiver>
+   <slot>SetAOStrength(double)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>920</x>
+     <y>450</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>300</x>
+     <y>300</y>
     </hint>
    </hints>
   </connection>

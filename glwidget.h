@@ -100,44 +100,6 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    */
   void SetAlbedo(double, double, double);
 
-  /**
-   * @brief SetSSAODirections Sets the number of directions for SSAO sampling
-   */
-  void SetSSAODirections(int directions);
-
-  /**
-   * @brief SetSSAOSamplesPerDirection Sets the number of samples per direction for SSAO
-   */
-  void SetSSAOSamplesPerDirection(int samples);
-
-  /**
-   * @brief SetSSAORadius Sets the sampling radius for SSAO
-   */
-  void SetSSAORadius(double radius);
-
-  /**
-   * @brief SetSSAORenderMode Sets the current SSAO render mode
-   */
-  void SetSSAORenderMode(int mode);
-
-  /**
-   * @brief EnableSSAO Enables or disables SSAO rendering
-   */
-  void EnableSSAO(bool enable);
-
-  /**
-   * @brief SSAO Enhancement Controls
-   * These methods allow the user to control the SSAO enhancement features such as randomization, blurring, and parameters for the blur effect.
-   */
-  void SetUseRandomization(bool use);
-  void SetUseBlur(bool use);
-  void SetBlurType(int type);
-  void SetBlurRadius(double radius);
-  void SetNormalThreshold(double threshold);
-  void SetDepthThreshold(double threshold);
-  void SetBiasAngle(double angle);
-  void SetAOStrength(double strength);
-
  protected:
   /**
    * @brief initializeGL Initializes OpenGL variables and loads, compiles and
@@ -462,6 +424,44 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    * @brief SetFaces Signal that updates the interface label "Framerate".
    */
   void SetRoughness(double);
+
+   /**
+   * @brief SetSSAODirections Sets the number of directions for SSAO sampling
+   */
+  void SetSSAODirections(int directions);
+
+  /**
+   * @brief SetSSAOSamplesPerDirection Sets the number of samples per direction for SSAO
+   */
+  void SetSSAOSamplesPerDirection(int samples);
+
+  /**
+   * @brief SetSSAORadius Sets the sampling radius for SSAO
+   */
+  void SetSSAORadius(double radius);
+
+  /**
+   * @brief SetSSAORenderMode Sets the current SSAO render mode
+   */
+  void SetSSAORenderMode(int mode);
+
+  /**
+   * @brief EnableSSAO Enables or disables SSAO rendering
+   */
+  void EnableSSAO(bool enable);
+
+  /**
+   * @brief SSAO Enhancement Controls
+   * These methods allow the user to control the SSAO enhancement features such as randomization, blurring, and parameters for the blur effect.
+   */
+  void SetUseRandomization(bool use);
+  void SetUseBlur(bool use);
+  void SetBlurType(int type);
+  void SetBlurRadius(double radius);
+  void SetNormalThreshold(double threshold);
+  void SetDepthThreshold(double threshold);
+  void SetBiasAngle(double angle);
+  void SetAOStrength(double strength);
 
  signals:
   /**

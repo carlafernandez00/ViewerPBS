@@ -207,7 +207,20 @@ GLWidget::~GLWidget() {
     glDeleteTextures(1, &albedo_texture_);
     glDeleteTextures(1, &normal_texture_);
     glDeleteTextures(1, &depth_texture_);
+    glDeleteFramebuffers(1, &ssao_FBO_);
+    glDeleteTextures(1, &ssao_texture_);
+    glDeleteFramebuffers(1, &blur_FBO_);
+    glDeleteTextures(1, &blurred_ssao_texture_);
+    glDeleteTextures(1, &noise_texture_);
 
+    glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &VBO_v);
+    glDeleteBuffers(1, &VBO_n);
+    glDeleteBuffers(1, &VBO_tc);
+    glDeleteBuffers(1, &VBO_i);
+     glDeleteVertexArrays(1, &VAO_sky);
+    glDeleteBuffers(1, &VBO_v_sky);
+    glDeleteBuffers(1, &VBO_i_sky);
   }
 }
 
@@ -605,8 +618,8 @@ void GLWidget::InitializeSSAO() {
 
   // Print FBO status and texture IDs for debugging
   GLenum fbStatus2 = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-  std::cerr << "[InitializeSSAO] FBO status after glDrawBuffers: 0x" << std::hex << fbStatus2 << " (" << fbStatusString(fbStatus2) << ")" << std::endl;
-  std::cerr << "[InitializeSSAO] albedo_texture_=" << albedo_texture_ << ", normal_texture_=" << normal_texture_ << std::endl;
+  // std::cerr << "[InitializeSSAO] FBO status after glDrawBuffers: 0x" << std::hex << fbStatus2 << " (" << fbStatusString(fbStatus2) << ")" << std::endl;
+  // std::cerr << "[InitializeSSAO] albedo_texture_=" << albedo_texture_ << ", normal_texture_=" << normal_texture_ << std::endl;
 
   GLenum fbStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
   if (fbStatus != GL_FRAMEBUFFER_COMPLETE) {
@@ -798,6 +811,22 @@ void GLWidget::keyPressEvent(QKeyEvent *event) {
           programs_[i] = std::make_unique<QOpenGLShaderProgram>();
           LoadProgram(kShaderFiles[i][0], kShaderFiles[i][1], programs_[i].get());
       }
+      // reset SSAO shaders
+      gbuffer_program_.reset();
+      gbuffer_program_ = std::make_unique<QOpenGLShaderProgram>();
+      LoadProgram(kGBufferShaderFiles[0], kGBufferShaderFiles[1], gbuffer_program_.get());
+
+      ssao_program_.reset();
+      ssao_program_ = std::make_unique<QOpenGLShaderProgram>();
+      LoadProgram(kSSAOShaderFiles[0], kSSAOShaderFiles[1], ssao_program_.get());
+
+      blur_program_.reset();
+      blur_program_ = std::make_unique<QOpenGLShaderProgram>();
+      LoadProgram(kBlurShaderFiles[0], kBlurShaderFiles[1], blur_program_.get());
+
+      final_program_.reset();
+      final_program_ = std::make_unique<QOpenGLShaderProgram>();
+      LoadProgram(kFinalShaderFiles[0], kFinalShaderFiles[1], final_program_.get());
   }
 
   update();
