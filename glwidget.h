@@ -291,7 +291,8 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
   bool use_randomization_;
   float bias_angle_;            // To reduce tangent surface artifacts
   float ao_strength_;           // AO effect strength
-
+  int ao_algorithm_;            // 0: Spherical Sampling, 1: Horizon Based Ambient Occlusion
+  
   bool use_blur_;
   int blur_type_;               // 1:Simple, 2:Bilateral, 3:Gaussian
   float blur_radius_;
@@ -451,16 +452,62 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
   void EnableSSAO(bool enable);
 
   /**
-   * @brief SSAO Enhancement Controls
-   * These methods allow the user to control the SSAO enhancement features such as randomization, blurring, and parameters for the blur effect.
+   * @brief SetUseRandomization Sets whether to use randomization in SSAO sampling
+   * @param use Whether to use randomization
    */
   void SetUseRandomization(bool use);
+
+  /**
+   * @brief SetBasicSSAO Sets the basic SSAO algorithm
+   */
+  void SetBasicSSAO(bool set);
+
+  /**
+   * @brief SetHBAO Sets the Horizon Based Ambient Occlusion algorithm
+   * @param set Whether to use HBAO
+   */
+  void SetHBAO(bool set);
+
+  /**
+   * @brief SetUseBlur Sets whether to use blurring in SSAO Final Composition.
+   * @param use Whether to use blurring
+   */
   void SetUseBlur(bool use);
+
+  /**
+   * @brief SetBlurType Sets the type of blur to use in blur SSAO
+   * @param type The type of blur (1: Simple, 2: Bilateral, 3: Gaussian)
+   */
   void SetBlurType(int type);
+
+  /**
+   * @brief SetBlurRadius Sets the radius of the blur in blur SSAO
+   * @param radius The radius of the blur
+   */
   void SetBlurRadius(double radius);
+
+  /**
+   * @brief SetNormalThreshold Sets the normal threshold for bilateral blur
+   * @param threshold The normal threshold value
+   */
   void SetNormalThreshold(double threshold);
+
+  /**
+   * @brief SetDepthThreshold Sets the depth threshold for bilateral blur
+   * @param threshold The depth threshold value
+   */
   void SetDepthThreshold(double threshold);
+
+  /**
+   * @brief SetBiasAngle Sets the bias angle for SSAO
+   * @param angle The bias angle value
+   */
   void SetBiasAngle(double angle);
+
+  /**
+   * @brief SetAOStrength Sets the ambient occlusion strength
+   * @param strength The ambient occlusion strength value
+   */
   void SetAOStrength(double strength);
 
  signals:

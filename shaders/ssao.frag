@@ -21,6 +21,7 @@ uniform float zFar;
 uniform float fov;
 
 // Randomization controls
+uniform int ao_algorithm;
 uniform bool use_randomization;
 uniform float bias_angle;
 
@@ -69,6 +70,110 @@ float getRandomRotation(vec2 texCoord) {
         return 0.0;
     }
 }
+
+// Compute tangent angle for HBAO 
+float computeTangentAngle(vec3 normal, vec2 screen_direction, vec3 position) {
+    // The tangent angle t(θ) is the signed elevation angle of the surface tangent vector
+    
+    // Project the normal onto the plane perpendicular to view direction
+    vec3 view_dir = vec3(0.0, 0.0, 1.0); // View direction in eye space (+Z)
+    vec3 projected_normal = normal - view_dir * dot(normal, view_dir);
+    projected_normal = normalize(projected_normal);
+
+    // Convert screen direction to eye space direction
+    vec3 eye_direction = normalize(vec3(screen_direction, 0.0));
+    
+    // Calculate tangent angle: signed elevation angle of surface tangent
+    float dot_product = clamp(dot(projected_normal, eye_direction), -1.0, 1.0);
+    return asin(dot_product);
+}
+
+// HBAO horizon angle computation
+float computeHorizonAngle(vec2 texCoord, vec3 position, vec3 normal, vec2 direction, float tangent_angle, out float attenuation) {
+    float max_horizon_angle = tangent_angle; // Start with tangent angle
+    attenuation = 0.0;
+    
+    // Convert sample radius from world space to screen space
+    float radius_screen = sample_radius / abs(position.z) * projection[0][0] * 0.5;
+    radius_screen = clamp(radius_screen, 0.001, 0.1);
+
+    // Step along the direction
+    for (int step = 1; step <= samples_per_direction; step++) {
+        float step_size = (float(step) / float(samples_per_direction)) * radius_screen;
+        
+        // Apply jitter if randomization is enabled (as mentioned in paper)
+        if (use_randomization) {
+            vec2 jitterCoord = texCoord + direction * float(step) * 0.01;
+            float jitter = simpleNoise(jitterCoord) * 0.2 - 0.1;
+            step_size *= (1.0 + jitter);
+        }
+
+        vec2 sample_coord = texCoord + direction * step_size;
+
+        // Check bounds
+        if (sample_coord.x < 0.0 || sample_coord.x > 1.0 || 
+            sample_coord.y < 0.0 || sample_coord.y > 1.0) {
+            continue;
+        }
+
+        float sample_depth = texture(depth_texture, sample_coord).r;  
+        if (sample_depth >= 1.0) continue;
+
+        vec3 sample_position = reconstructPosition(sample_coord, sample_depth);
+        vec3 D = sample_position - position; // D = Si - P 
+
+        // Skip samples outside influence radius
+        float sample_distance = length(D);
+        if (sample_distance > sample_radius) continue;
+
+        // elevation angle formula: α(Si) = atan(-D.z/||D.xy||)
+        float horizontal_distance = length(D.xy);
+        if (horizontal_distance > 0.001) {
+            float elevation_angle = atan(-D.z / horizontal_distance);
+
+            // h(θ) = max(t(θ), α(Si), i = 1..Ns)
+            if (elevation_angle > max_horizon_angle) {
+                max_horizon_angle = elevation_angle;
+                // W(θ) = max(0, 1 - r(θ)/R)
+                attenuation = max(0.0, 1.0 - sample_distance / sample_radius);
+            }
+        }
+    }
+    return max_horizon_angle;
+}
+
+// HBAO calculation -> paper's equation (3)
+float calculateHBAO(vec2 texCoord, vec3 position, vec3 normal) {
+    float totalAO = 0.0;
+    float random_rotation = getRandomRotation(texCoord);
+    
+    // Paper uses Monte Carlo integration over Nd directions
+    for (int dir = 0; dir < num_directions; dir++) {
+        // Calculate direction angle
+        float base_angle = (float(dir) / float(num_directions)) * 2.0 * PI;
+        float angle = base_angle + random_rotation;
+        vec2 direction = vec2(cos(angle), sin(angle));
+        
+        // Compute tangent angle for this direction
+        float tangent_angle = computeTangentAngle(normal, direction, position);
+
+        // Compute horizon angle
+        float attenuation;
+        float horizon_angle = computeHorizonAngle(texCoord, position, normal, direction, tangent_angle, attenuation);
+
+        // A = 1 - (1/2π) ∫ (sin(h(θ)) - sin(t(θ)))W(θ)dθ -> Monte Carlo
+        float sin_horizon = sin(clamp(horizon_angle, -PI/2.0, PI/2.0));
+        float sin_tangent = sin(clamp(tangent_angle, -PI/2.0, PI/2.0));
+
+        float ao_contribution = (sin_horizon - sin_tangent) * attenuation;
+        totalAO += max(0.0, ao_contribution);
+    }
+
+    // Monte Carlo integration: (2π/Nd) * (1/2π) * sum = sum/Nd
+    float ao = 1.0 - (totalAO / float(num_directions));
+    return clamp(ao, 0.0, 1.0);
+}
+
 
 // SSAO calculation 
 float calculateSSAO(vec2 texCoord, vec3 position, vec3 normal) {
@@ -160,8 +265,17 @@ void main()
     vec3 normal = normalize(texture(normal_texture, v_uv).rgb * 2.0 - 1.0);
     vec3 position = reconstructPosition(v_uv, depth);
 
-    float ao = calculateSSAO(v_uv, position, normal);
-    
+    float ao;
+
+    // Spherical Sampling
+    if (ao_algorithm == 0) {
+        ao = calculateSSAO(v_uv, position, normal);
+    }
+    // Horizon-Based Sampling
+    else if (ao_algorithm == 1) {
+        ao = calculateHBAO(v_uv, position, normal);
+    }
+
     // Output AO value (white = no occlusion, black = full occlusion)
     frag_color = vec4(ao, ao, ao, 1.0);
 }

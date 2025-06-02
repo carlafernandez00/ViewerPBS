@@ -10,6 +10,7 @@ uniform sampler2D blurred_ssao_texture;
 
 uniform int ssao_render_mode;
 uniform bool use_blurred_ssao;
+uniform float ao_strength;
 
 uniform float zNear;
 uniform float zFar;
@@ -56,7 +57,7 @@ void main()
     }
     // Final result: Albedo * AO
     else if (ssao_render_mode == 5) {
-        frag_color = vec4(color.rgb * ao, 1.0);
+        frag_color = vec4(color.rgb * ao * ao_strength, 1.0);
     }
     // Default case: just output the color
     else {

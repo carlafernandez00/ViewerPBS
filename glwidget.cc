@@ -182,8 +182,9 @@ GLWidget::GLWidget(QWidget *parent)
       ssao_samples_per_direction_(6),
       ssao_sample_radius_(0.5f),
       use_randomization_(false),
+      ao_algorithm_(0),         // 0: Spherical Sampling, 1: Horizon Based Ambient Occlusion
       use_blur_(false),
-      blur_type_(2),            // Bilateral blur
+      blur_type_(0),            // 0: simple, 1: bilateral, 2: gaussian
       blur_radius_(2.0f),
       normal_threshold_(0.8f),
       depth_threshold_(0.01f),
@@ -218,7 +219,7 @@ GLWidget::~GLWidget() {
     glDeleteBuffers(1, &VBO_n);
     glDeleteBuffers(1, &VBO_tc);
     glDeleteBuffers(1, &VBO_i);
-     glDeleteVertexArrays(1, &VAO_sky);
+    glDeleteVertexArrays(1, &VAO_sky);
     glDeleteBuffers(1, &VBO_v_sky);
     glDeleteBuffers(1, &VBO_i_sky);
   }
@@ -472,6 +473,7 @@ void GLWidget::initializeGL ()
   std::cout << "Renderer: " << renderer << std::endl;
   std::cout << "OpenGL version: " << version << std::endl;
   std::cout << "GLSL version: " << glslVersion << std::endl;
+  std::cout << "C++ Standard: " << __cplusplus << std::endl;
     
 
   //initializing opengl state
@@ -1083,6 +1085,7 @@ void GLWidget::renderWithSSAO ()
       glUniform1f(ssao_program_->uniformLocation("zNear"), static_cast<float>(kZNear));
       glUniform1f(ssao_program_->uniformLocation("zFar"), static_cast<float>(kZFar));
       glUniform1f(ssao_program_->uniformLocation("fov"), static_cast<float>(kFieldOfView));
+      glUniform1i(ssao_program_->uniformLocation("ao_algorithm"), ao_algorithm_);
       glUniform1i(ssao_program_->uniformLocation("use_randomization"), use_randomization_ ? 1 : 0);
       glUniform1f(ssao_program_->uniformLocation("bias_angle"), bias_angle_);
 
@@ -1116,7 +1119,7 @@ void GLWidget::renderWithSSAO ()
       blur_program_->release();
 
       // FINAL STEP: Render to the screen
-      GLuint albedo_texture_location, normal_texture_location, depth_texture_location, ssao_texture_location, 
+      GLuint albedo_texture_location, normal_texture_location, depth_texture_location, ssao_texture_location, ao_strength_location,
       ssao_render_mode_location, z_near_location, z_far_location, use_blur_location, blur_ssao_texture_location;
 
       glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
@@ -1133,6 +1136,7 @@ void GLWidget::renderWithSSAO ()
       z_far_location                  = final_program_->uniformLocation("zFar");
       use_blur_location               = final_program_->uniformLocation("use_blurred_ssao");
       blur_ssao_texture_location      = final_program_->uniformLocation("blurred_ssao_texture");
+      ao_strength_location            = final_program_->uniformLocation("ao_strength");
 
       glUniform1i(albedo_texture_location, 0);      // albedo texture
       glUniform1i(normal_texture_location, 1);      // normal texture
@@ -1141,6 +1145,7 @@ void GLWidget::renderWithSSAO ()
       glUniform1i(blur_ssao_texture_location, 5);   // Blur SSAO texture
       glUniform1i(ssao_render_mode_location, currentSSAORenderMode_);
       glUniform1i(use_blur_location, use_blur_ ? 1 : 0);
+      glUniform1f(ao_strength_location, ao_strength_);
 
       glUniform1f(z_near_location, static_cast<float>(kZNear));
       glUniform1f(z_far_location, static_cast<float>(kZFar));
@@ -1273,6 +1278,20 @@ void GLWidget::SetUseRandomization(bool use) {
     update();
 }
 
+void GLWidget::SetBasicSSAO(bool set) {
+    if(set) {
+        ao_algorithm_ = 0;  // Basic SSAO algorithm
+        update();
+    }
+}
+
+void GLWidget::SetHBAO(bool set) {
+    if(set) {
+        ao_algorithm_ = 1;  // HBAO algorithm
+        update();
+    }
+}
+
 void GLWidget::SetUseBlur(bool use) {
     use_blur_ = use;
     update();
@@ -1304,7 +1323,7 @@ void GLWidget::SetBiasAngle(double angle) {
 }
 
 void GLWidget::SetAOStrength(double strength) {
-    ao_strength_ = static_cast<float>(std::max(0.0, std::min(2.0, strength)));
+    ao_strength_ = static_cast<float>(std::max(0.0, std::min(1.0, strength)));
     update();
 }
 

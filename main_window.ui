@@ -522,7 +522,7 @@
         <property name="minimumSize">
          <size>
           <width>200</width>
-          <height>500</height>
+          <height>600</height>
          </size>
         </property>
         <property name="maximumSize">
@@ -553,12 +553,61 @@
          </property>
         </widget>
         
+        <!-- SSAO Algorithm Radio Buttons -->
+        <widget class="QLabel" name="label_ao_algorithm">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>60</y>
+           <width>80</width>
+           <height>20</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Algorithm:</string>
+         </property>
+        </widget>
+        
+        <widget class="QRadioButton" name="radio_basic_ssao">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>85</y>
+           <width>120</width>
+           <height>20</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Basic SSAO</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+        
+        <widget class="QRadioButton" name="radio_hbao">
+         <property name="geometry">
+          <rect>
+           <x>20</x>
+           <y>110</y>
+           <width>120</width>
+           <height>20</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>HBAO</string>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
+         </property>
+        </widget>
+        
         <!-- Render Mode Combo -->
         <widget class="QLabel" name="label_render_mode">
          <property name="geometry">
           <rect>
            <x>20</x>
-           <y>60</y>
+           <y>140</y>
            <width>80</width>
            <height>20</height>
           </rect>
@@ -571,7 +620,7 @@
          <property name="geometry">
           <rect>
            <x>20</x>
-           <y>85</y>
+           <y>165</y>
            <width>160</width>
            <height>25</height>
           </rect>
@@ -613,7 +662,7 @@
          <property name="geometry">
           <rect>
            <x>20</x>
-           <y>120</y>
+           <y>200</y>
            <width>80</width>
            <height>20</height>
           </rect>
@@ -626,7 +675,7 @@
          <property name="geometry">
           <rect>
            <x>110</x>
-           <y>120</y>
+           <y>200</y>
            <width>70</width>
            <height>25</height>
           </rect>
@@ -646,7 +695,7 @@
          <property name="geometry">
           <rect>
            <x>20</x>
-           <y>150</y>
+           <y>230</y>
            <width>80</width>
            <height>20</height>
           </rect>
@@ -659,7 +708,7 @@
          <property name="geometry">
           <rect>
            <x>110</x>
-           <y>150</y>
+           <y>230</y>
            <width>70</width>
            <height>25</height>
           </rect>
@@ -679,7 +728,7 @@
          <property name="geometry">
           <rect>
            <x>20</x>
-           <y>180</y>
+           <y>260</y>
            <width>80</width>
            <height>20</height>
           </rect>
@@ -692,7 +741,7 @@
          <property name="geometry">
           <rect>
            <x>110</x>
-           <y>180</y>
+           <y>260</y>
            <width>70</width>
            <height>25</height>
           </rect>
@@ -716,7 +765,7 @@
          <property name="geometry">
           <rect>
            <x>20</x>
-           <y>210</y>
+           <y>290</y>
            <width>160</width>
            <height>23</height>
           </rect>
@@ -734,7 +783,7 @@
          <property name="geometry">
           <rect>
            <x>20</x>
-           <y>240</y>
+           <y>320</y>
            <width>80</width>
            <height>20</height>
           </rect>
@@ -747,7 +796,7 @@
          <property name="geometry">
           <rect>
            <x>110</x>
-           <y>240</y>
+           <y>320</y>
            <width>70</width>
            <height>25</height>
           </rect>
@@ -771,7 +820,7 @@
          <property name="geometry">
           <rect>
            <x>20</x>
-           <y>270</y>
+           <y>350</y>
            <width>160</width>
            <height>23</height>
           </rect>
@@ -788,7 +837,7 @@
          <property name="geometry">
           <rect>
            <x>20</x>
-           <y>300</y>
+           <y>380</y>
            <width>80</width>
            <height>20</height>
           </rect>
@@ -801,7 +850,7 @@
          <property name="geometry">
           <rect>
            <x>20</x>
-           <y>325</y>
+           <y>405</y>
            <width>160</width>
            <height>25</height>
           </rect>
@@ -827,7 +876,7 @@
          <property name="geometry">
           <rect>
            <x>20</x>
-           <y>355</y>
+           <y>435</y>
            <width>80</width>
            <height>20</height>
           </rect>
@@ -840,7 +889,7 @@
          <property name="geometry">
           <rect>
            <x>110</x>
-           <y>355</y>
+           <y>435</y>
            <width>70</width>
            <height>25</height>
           </rect>
@@ -864,7 +913,7 @@
          <property name="geometry">
           <rect>
            <x>20</x>
-           <y>385</y>
+           <y>465</y>
            <width>80</width>
            <height>20</height>
           </rect>
@@ -877,7 +926,7 @@
          <property name="geometry">
           <rect>
            <x>110</x>
-           <y>385</y>
+           <y>465</y>
            <width>70</width>
            <height>25</height>
           </rect>
@@ -900,7 +949,7 @@
          <property name="geometry">
           <rect>
            <x>20</x>
-           <y>415</y>
+           <y>495</y>
            <width>80</width>
            <height>20</height>
           </rect>
@@ -913,7 +962,7 @@
          <property name="geometry">
           <rect>
            <x>110</x>
-           <y>415</y>
+           <y>495</y>
            <width>70</width>
            <height>25</height>
           </rect>
@@ -937,7 +986,7 @@
          <property name="geometry">
           <rect>
            <x>20</x>
-           <y>445</y>
+           <y>525</y>
            <width>80</width>
            <height>20</height>
           </rect>
@@ -950,7 +999,7 @@
          <property name="geometry">
           <rect>
            <x>110</x>
-           <y>445</y>
+           <y>525</y>
            <width>70</width>
            <height>25</height>
           </rect>
@@ -1103,6 +1152,8 @@
     <slot>SetNormalThreshold(double)</slot>
     <slot>SetDepthThreshold(double)</slot>
     <slot>SetAOStrength(double)</slot>
+    <slot>SetBasicSSAO(bool)</slot>
+    <slot>SetHBAO(bool)</slot>
    </slots>
   </customwidget>
  </customwidgets>
@@ -1415,6 +1466,41 @@
    </hints>
   </connection>
   
+  <!-- RADIO BUTTON CONNECTIONS FOR AO ALGORITHM -->
+  <connection>
+   <sender>radio_basic_ssao</sender>
+   <signal>clicked(bool)</signal>
+   <receiver>glwidget</receiver>
+   <slot>SetBasicSSAO(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>920</x>
+     <y>95</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>300</x>
+     <y>300</y>
+    </hint>
+   </hints>
+  </connection>
+  
+  <connection>
+   <sender>radio_hbao</sender>
+   <signal>clicked(bool)</signal>
+   <receiver>glwidget</receiver>
+   <slot>SetHBAO(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>920</x>
+     <y>120</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>300</x>
+     <y>300</y>
+    </hint>
+   </hints>
+  </connection>
+  
   <connection>
    <sender>combo_ssao_render_mode</sender>
    <signal>currentIndexChanged(int)</signal>
@@ -1423,7 +1509,7 @@
    <hints>
     <hint type="sourcelabel">
      <x>920</x>
-     <y>100</y>
+     <y>175</y>
     </hint>
     <hint type="destinationlabel">
      <x>300</x>
@@ -1440,7 +1526,7 @@
    <hints>
     <hint type="sourcelabel">
      <x>920</x>
-     <y>130</y>
+     <y>210</y>
     </hint>
     <hint type="destinationlabel">
      <x>300</x>
@@ -1457,7 +1543,7 @@
    <hints>
     <hint type="sourcelabel">
      <x>920</x>
-     <y>160</y>
+     <y>240</y>
     </hint>
     <hint type="destinationlabel">
      <x>300</x>
@@ -1474,7 +1560,7 @@
    <hints>
     <hint type="sourcelabel">
      <x>920</x>
-     <y>190</y>
+     <y>270</y>
     </hint>
     <hint type="destinationlabel">
      <x>300</x>
@@ -1491,7 +1577,7 @@
    <hints>
     <hint type="sourcelabel">
      <x>920</x>
-     <y>220</y>
+     <y>300</y>
     </hint>
     <hint type="destinationlabel">
      <x>300</x>
@@ -1508,7 +1594,7 @@
    <hints>
     <hint type="sourcelabel">
      <x>920</x>
-     <y>250</y>
+     <y>330</y>
     </hint>
     <hint type="destinationlabel">
      <x>300</x>
@@ -1525,7 +1611,7 @@
    <hints>
     <hint type="sourcelabel">
      <x>920</x>
-     <y>280</y>
+     <y>360</y>
     </hint>
     <hint type="destinationlabel">
      <x>300</x>
@@ -1542,7 +1628,7 @@
    <hints>
     <hint type="sourcelabel">
      <x>920</x>
-     <y>330</y>
+     <y>415</y>
     </hint>
     <hint type="destinationlabel">
      <x>300</x>
@@ -1559,7 +1645,7 @@
    <hints>
     <hint type="sourcelabel">
      <x>920</x>
-     <y>360</y>
+     <y>445</y>
     </hint>
     <hint type="destinationlabel">
      <x>300</x>
@@ -1576,7 +1662,7 @@
    <hints>
     <hint type="sourcelabel">
      <x>920</x>
-     <y>390</y>
+     <y>475</y>
     </hint>
     <hint type="destinationlabel">
      <x>300</x>
@@ -1593,7 +1679,7 @@
    <hints>
     <hint type="sourcelabel">
      <x>920</x>
-     <y>420</y>
+     <y>505</y>
     </hint>
     <hint type="destinationlabel">
      <x>300</x>
@@ -1610,7 +1696,7 @@
    <hints>
     <hint type="sourcelabel">
      <x>920</x>
-     <y>450</y>
+     <y>535</y>
     </hint>
     <hint type="destinationlabel">
      <x>300</x>
