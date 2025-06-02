@@ -6,6 +6,7 @@ uniform sampler2D albedo_texture;
 uniform sampler2D normal_texture;
 uniform sampler2D depth_texture;
 uniform sampler2D ssao_texture;
+uniform sampler2D blurred_ssao_texture;
 
 uniform int ssao_render_mode;
 uniform bool use_blurred_ssao;
@@ -23,10 +24,10 @@ void main()
     vec3 normal = texture(normal_texture, v_uv).rgb;
     float depth = texture(depth_texture, v_uv).r;
     float ssao = texture(ssao_texture, v_uv).r;
-    // float ssao_blurred = texture(blurred_ssao_texture, v_uv).r; 
+    float ssao_blurred = texture(blurred_ssao_texture, v_uv).r; 
 
-    // // Choose which AO to use for the final output
-    // float ao = use_blurred_ssao ? ssao_blurred : ssao;
+    // Choose which AO to use for the final output
+    float ao = use_blurred_ssao ? ssao_blurred : ssao;
 
     // Normal
     if(ssao_render_mode == 0){ 
@@ -49,12 +50,16 @@ void main()
     else if(ssao_render_mode == 3){ 
         frag_color = vec4(vec3(ssao), 1.0);
     }
-    else if (ssao_render_mode == 5) {
-        // Show final result (albedo * AO)
-        frag_color = vec4(color.rgb * ssao, 1.0);
+    // Blurred SSAO
+    else if(ssao_render_mode == 4) {
+        frag_color = vec4(vec3(ssao_blurred), 1.0);
     }
-    // Default case for unsupported render modes
+    // Final result: Albedo * AO
+    else if (ssao_render_mode == 5) {
+        frag_color = vec4(color.rgb * ao, 1.0);
+    }
+    // Default case: just output the color
     else {
-        frag_color = vec4(1.0, 0.0, 1.0, 1.0); 
+        frag_color = vec4(color, 1.0); 
     }
 }

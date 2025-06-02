@@ -1,167 +1,149 @@
-#version 330
+#version 330 core
+
 in vec2 v_uv;
 
 // Input textures
+uniform sampler2D ssao_texture;
 uniform sampler2D normal_texture;
 uniform sampler2D depth_texture;
-uniform sampler2D noise_texture;
 
-// SSAO parameters
-uniform int num_directions;
-uniform int samples_per_direction;
-uniform float sample_radius;
-uniform mat4 projection;
+uniform int blur_type; // 0=Simple, 1=Bilateral, 2=Gaussian
+uniform float blur_radius;
 uniform vec2 viewport_size;
-uniform vec2 noise_scale;
 
-// Camera parameters
-uniform float zNear;
-uniform float zFar;
-uniform float fov;
-
-// Randomization controls
-uniform bool use_randomization;
-uniform float bias_angle;
+// Bilateral blur parameters
+uniform float normal_threshold;
+uniform float depth_threshold;
 
 out vec4 frag_color;
 
 const float PI = 3.14159265359;
 
-// reconstruct position from depth and texture coordinates in eye space
-vec3 reconstructPosition(vec2 texCoord, float depth) {
-    
-    float z_ndc = depth * 2.0 - 1.0;                                               // Convert from [0,1] depth to NDC z
-    float z_eye = (2.0 * zNear * zFar) / (zFar + zNear - z_ndc * (zFar - zNear));  // Convert NDC z to eye space z
-    vec2 ndc_xy = texCoord * 2.0 - 1.0;                                            // Convert texture coordinates to NDC space [-1, 1]
-    
-    // Calculate the width and height of the frustum at z_eye
-    float aspect = viewport_size.x / viewport_size.y;
-    float fov_rad = radians(fov);
-    float half_height = tan(fov_rad * 0.5) * abs(z_eye);
-    float half_width = half_height * aspect;
-    
-    // Calculate eye space position
-    vec3 pos_eye;
-    pos_eye.x = ndc_xy.x * half_width;
-    pos_eye.y = ndc_xy.y * half_height;
-    pos_eye.z = z_eye;
-    
-    return pos_eye;
+// Gaussian weights for blur
+float gaussian(float x, float sigma) {
+    return exp(-(x * x) / (2.0 * sigma * sigma)) / (sqrt(2.0 * PI) * sigma);
 }
 
-// Noise function 
-float simpleNoise(vec2 co) {
-    return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
-}
-
-// Get random rotation vector
-vec3 getRandomVector(vec2 texCoord) {
-    if (use_randomization) {
-        // Use noise texture for better randomization
-        vec2 noiseCoord = texCoord * noise_scale;
-        vec3 noise = texture(noise_texture, noiseCoord).xyz * 2.0 - 1.0;
-        return normalize(noise);
-    } else {
-        // Fallback to simple noise
-        float angle = simpleNoise(texCoord * 100.0) * 2.0 * PI;
-        return vec3(cos(angle), sin(angle), 0.0);
-    }
-}
-
-// SSAO calculation using circular kernel
-float calculateSSAO(vec2 texCoord, vec3 position, vec3 normal) {
-    float occlusion = 0.0;
-    int total_samples = 0;
+// Simple box blur
+vec4 simpleBlur() {
+    vec2 texel_size = 1.0 / viewport_size;
+    vec4 result = vec4(0.0);
+    float total_weight = 0.0;
     
-    // Get random rotation vector
-    vec3 randomVec = getRandomVector(texCoord);
-    
-    // Create TBN matrix for oriented sampling
-    vec3 tangent = normalize(randomVec - normal * dot(randomVec, normal));
-    vec3 bitangent = cross(normal, tangent);
-    mat3 TBN = mat3(tangent, bitangent, normal);
-    
-    // Convert sample radius from world space to screen space
-    vec4 offset = vec4(sample_radius, 0.0, position.z, 1.0);
-    offset = projection * offset;
-    float radius_screen = offset.x / offset.w;
-    radius_screen = abs(radius_screen);
-    
-    // Sample in hemisphere oriented by normal
-    for (int i = 0; i < num_directions * samples_per_direction; i++) {
-        // Generate sample in hemisphere
-        float angle = (float(i) / float(num_directions * samples_per_direction)) * 2.0 * PI;
-        float radius = sqrt(float(i + 1) / float(num_directions * samples_per_direction));
-        
-        // Add some jittering
-        vec2 jitter = vec2(simpleNoise(texCoord + float(i)), simpleNoise(texCoord + float(i) + 1000.0));
-        angle += (jitter.x - 0.5) * 0.5;
-        radius *= (0.8 + jitter.y * 0.4);
-        
-        vec3 sample_dir = vec3(cos(angle) * radius, sin(angle) * radius, sqrt(1.0 - radius * radius));
-        sample_dir = TBN * sample_dir;
-        
-        // Project to screen space
-        vec4 sample_pos_4d = vec4(position + sample_dir * sample_radius, 1.0);
-        sample_pos_4d = projection * sample_pos_4d;
-        vec2 sample_coord = (sample_pos_4d.xy / sample_pos_4d.w) * 0.5 + 0.5;
-        
-        // Check bounds
-        if (sample_coord.x < 0.0 || sample_coord.x > 1.0 || 
-            sample_coord.y < 0.0 || sample_coord.y > 1.0) {
-            continue;
-        }
-        
-        // Sample depth and reconstruct position
-        float sample_depth = texture(depth_texture, sample_coord).r;
-        if (sample_depth >= 1.0) continue;
-        
-        vec3 sample_position = reconstructPosition(sample_coord, sample_depth);
-        
-        // Calculate occlusion
-        vec3 sample_vector = sample_position - position;
-        float sample_distance = length(sample_vector);
-        vec3 sample_direction = normalize(sample_vector);
-        
-        // Check angle with normal (bias to reduce tangent surface artifacts)
-        float dot_product = dot(normal, sample_direction);
-        if (dot_product > bias_angle) {
-            // Range check to avoid distant surfaces
-            if (sample_distance < sample_radius) {
-                float attenuation = 1.0 - smoothstep(0.0, sample_radius, sample_distance);
-                occlusion += attenuation;
+    int radius = int(blur_radius);
+    for (int x = -radius; x <= radius; x++) {
+        for (int y = -radius; y <= radius; y++) {
+            vec2 offset = vec2(float(x), float(y)) * texel_size;
+            vec2 sample_coord = v_uv + offset;
+            
+            if (sample_coord.x >= 0.0 && sample_coord.x <= 1.0 && 
+                sample_coord.y >= 0.0 && sample_coord.y <= 1.0) {
+                result += texture(ssao_texture, sample_coord);
+                total_weight += 1.0;
             }
         }
-        
-        total_samples++;
     }
     
-    // Normalize occlusion
-    if (total_samples > 0) {
-        occlusion = occlusion / float(total_samples);
-    }
-    
-    // Clamp result
-    occlusion = clamp(occlusion, 0.0, 1.0);
-    
-    // Return AO factor (0.0 = fully occluded, 1.0 = no occlusion)
-    return 1.0 - occlusion;
+    return result / total_weight;
 }
 
-void main()
-{
-    float depth = texture(depth_texture, v_uv).r;
-
-    // Skip background pixels - output white (no occlusion)
-    if (depth >= 1.0) {
-        frag_color = vec4(1.0);
-        return;
-    }
-
-    vec3 normal = normalize(texture(normal_texture, v_uv).rgb);
-    vec3 position = reconstructPosition(v_uv, depth);
-
-    float ao = calculateSSAO(v_uv, position, normal);
-    frag_color = vec4(vec3(ao), 1.0);
+// Gaussian blur
+vec4 gaussianBlur() {
+    vec2 texel_size = 1.0 / viewport_size;
+    vec4 result = vec4(0.0);
+    float total_weight = 0.0;
     
+    int radius = int(blur_radius);
+    float sigma = blur_radius / 2.0;
+    
+    for (int x = -radius; x <= radius; x++) {
+        for (int y = -radius; y <= radius; y++) {
+            vec2 offset = vec2(float(x), float(y)) * texel_size;
+            vec2 sample_coord = v_uv + offset;
+            
+            if (sample_coord.x >= 0.0 && sample_coord.x <= 1.0 && 
+                sample_coord.y >= 0.0 && sample_coord.y <= 1.0) {
+                
+                float distance = length(vec2(float(x), float(y)));
+                float weight = gaussian(distance, sigma);
+                
+                result += texture(ssao_texture, sample_coord) * weight;
+                total_weight += weight;
+            }
+        }
+    }
+    
+    return result / total_weight;
+}
+
+// Bilateral blur - preserves edges
+vec4 bilateralBlur() {
+    vec2 texel_size = 1.0 / viewport_size;
+    vec4 center_ssao = texture(ssao_texture, v_uv);
+    vec3 center_normal = texture(normal_texture, v_uv).xyz;
+    float center_depth = texture(depth_texture, v_uv).r;
+    
+    vec4 result = vec4(0.0);
+    float total_weight = 0.0;
+    
+    int radius = int(blur_radius);
+    float sigma = blur_radius / 2.0;
+    
+    for (int x = -radius; x <= radius; x++) {
+        for (int y = -radius; y <= radius; y++) {
+            vec2 offset = vec2(float(x), float(y)) * texel_size;
+            vec2 sample_coord = v_uv + offset;
+            
+            if (sample_coord.x >= 0.0 && sample_coord.x <= 1.0 && 
+                sample_coord.y >= 0.0 && sample_coord.y <= 1.0) {
+                
+                vec4 sample_ssao = texture(ssao_texture, sample_coord);
+                vec3 sample_normal = texture(normal_texture, sample_coord).xyz;
+                float sample_depth = texture(depth_texture, sample_coord).r;
+                
+                // Spatial weight (Gaussian)
+                float distance = length(vec2(float(x), float(y)));
+                float spatial_weight = gaussian(distance, sigma);
+                
+                // Normal similarity weight
+                float normal_diff = dot(center_normal, sample_normal);
+                float normal_weight = (normal_diff > normal_threshold) ? 1.0 : 0.1;
+                
+                // Depth similarity weight
+                float depth_diff = abs(center_depth - sample_depth);
+                float depth_weight = (depth_diff < depth_threshold) ? 1.0 : 0.1;
+                
+                // Combined weight
+                float weight = spatial_weight * normal_weight * depth_weight;
+                
+                result += sample_ssao * weight;
+                total_weight += weight;
+            }
+        }
+    }
+    
+    if (total_weight > 0.0) {
+        return result / total_weight;
+    } else {
+        return center_ssao;
+    }
+}
+
+void main() {
+    // Simple blur
+    if (blur_type == 0) {
+        frag_color = simpleBlur();
+    }
+    // Bilateral blur
+    else if (blur_type == 1) {
+        frag_color = bilateralBlur();
+    }
+    // Gaussian blur
+    else if (blur_type == 2) {
+        frag_color = gaussianBlur();
+    }
+    // Default case - simple blur
+    else {
+        frag_color = simpleBlur();
+    }
 }

@@ -327,13 +327,14 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
   int ssao_samples_per_direction_;
   float ssao_sample_radius_;
   bool use_randomization_;
+  float bias_angle_;            // To reduce tangent surface artifacts
+  float ao_strength_;           // AO effect strength
+
   bool use_blur_;
-  int blur_type_;               // 0=None, 1=Simple, 2=Bilateral, 3=Gaussian
+  int blur_type_;               // 1:Simple, 2:Bilateral, 3:Gaussian
   float blur_radius_;
   float normal_threshold_;      // For bilateral blur
   float depth_threshold_;       // For bilateral blur
-  float bias_angle_;            // To reduce tangent surface artifacts
-  float ao_strength_;           // AO effect strength
 
   GLuint VAO;
   GLuint VBO_v;

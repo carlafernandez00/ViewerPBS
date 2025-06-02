@@ -176,13 +176,13 @@ GLWidget::GLWidget(QWidget *parent)
       useTextures_(false),
       applyGammaCorrection_(false),
       // SSAO
-      SSAO_enabled_(true),
-      currentSSAORenderMode_(3), // 0 - Normals, 1 - Albedo, 2 - Depth, 3 - SSAO, 4 - Blurred SSAO, 5 - Final Composition
-      ssao_num_directions_(16),
-      ssao_samples_per_direction_(4),
+      SSAO_enabled_(false),
+      currentSSAORenderMode_(0), // 0 - Normals, 1 - Albedo, 2 - Depth, 3 - SSAO, 4 - Blurred SSAO, 5 - Final Composition
+      ssao_num_directions_(32),
+      ssao_samples_per_direction_(6),
       ssao_sample_radius_(0.5f),
-      use_randomization_(true),
-      use_blur_(true),
+      use_randomization_(false),
+      use_blur_(false),
       blur_type_(2),            // Bilateral blur
       blur_radius_(2.0f),
       normal_threshold_(0.8f),
@@ -526,8 +526,8 @@ void GLWidget::initializeGL ()
       exit(0);
   }
 
-  // LoadModel(".null"); // Load a sphere as default model
-  LoadModel("../models/mercedes-benz-clk430-convertible_ply/Mercedes-Benz CLK 430 Convertible.ply");
+  LoadModel(".null"); // Load a sphere as default model
+  // LoadModel("../models/mercedes-benz-clk430-convertible_ply/Mercedes-Benz CLK 430 Convertible.ply");
 
   // Load textures and cube maps
   LoadDefaultMaterials();
@@ -995,6 +995,7 @@ void GLWidget::renderWithSSAO ()
       glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, depth_texture_);
       glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, noise_texture_);
       glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D, ssao_texture_);
+      glActiveTexture(GL_TEXTURE5); glBindTexture(GL_TEXTURE_2D, blurred_ssao_texture_);
 
       // FIRST PASS: G-Buffer generation
       glBindFramebuffer(GL_FRAMEBUFFER, g_buffer_FBO_);
@@ -1033,7 +1034,7 @@ void GLWidget::renderWithSSAO ()
       glBindFramebuffer(GL_FRAMEBUFFER, ssao_FBO_);
       glViewport(0, 0, width_, height_);
       glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-      glClear(GL_COLOR_BUFFER_BIT);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
       ssao_program_->bind();
 
@@ -1061,10 +1062,33 @@ void GLWidget::renderWithSSAO ()
       glBindVertexArray(0);
       ssao_program_->release();
 
+      // PASS 3: Blur SSAO texture
+      glBindFramebuffer(GL_FRAMEBUFFER, blur_FBO_);
+      glViewport(0, 0, width_, height_);
+      glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+      blur_program_->bind();
+
+      // Send textures to the shader
+      glUniform1i(blur_program_->uniformLocation("ssao_texture"), 4);
+      glUniform1i(blur_program_->uniformLocation("normal_texture"), 1);
+      glUniform1i(blur_program_->uniformLocation("depth_texture"), 2);
+
+      glUniform2f(blur_program_->uniformLocation("viewport_size"), width_, height_);
+      glUniform1i(blur_program_->uniformLocation("blur_type"), blur_type_);
+      glUniform1f(blur_program_->uniformLocation("blur_radius"), blur_radius_);
+      glUniform1f(blur_program_->uniformLocation("normal_threshold"), normal_threshold_);
+      glUniform1f(blur_program_->uniformLocation("depth_threshold"), depth_threshold_);
+
+      glBindVertexArray(quad_VAO);
+      glDrawArrays(GL_TRIANGLES, 0, 6);
+      glBindVertexArray(0);
+      blur_program_->release();
 
       // FINAL STEP: Render to the screen
       GLuint albedo_texture_location, normal_texture_location, depth_texture_location, ssao_texture_location, 
-      ssao_render_mode_location, z_near_location, z_far_location;
+      ssao_render_mode_location, z_near_location, z_far_location, use_blur_location, blur_ssao_texture_location;
 
       glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
       glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -1078,12 +1102,16 @@ void GLWidget::renderWithSSAO ()
       ssao_render_mode_location       = final_program_->uniformLocation("ssao_render_mode");
       z_near_location                 = final_program_->uniformLocation("zNear");
       z_far_location                  = final_program_->uniformLocation("zFar");
+      use_blur_location               = final_program_->uniformLocation("use_blurred_ssao");
+      blur_ssao_texture_location      = final_program_->uniformLocation("blurred_ssao_texture");
 
-      glUniform1i(albedo_texture_location, 0);   // albedo texture
-      glUniform1i(normal_texture_location, 1);   // normal texture
-      glUniform1i(depth_texture_location, 2);    // depth texture
-      glUniform1i(ssao_texture_location, 4);     // SSAO texture
+      glUniform1i(albedo_texture_location, 0);      // albedo texture
+      glUniform1i(normal_texture_location, 1);      // normal texture
+      glUniform1i(depth_texture_location, 2);       // depth texture
+      glUniform1i(ssao_texture_location, 4);        // SSAO texture
+      glUniform1i(blur_ssao_texture_location, 5);   // Blur SSAO texture
       glUniform1i(ssao_render_mode_location, currentSSAORenderMode_);
+      glUniform1i(use_blur_location, use_blur_ ? 1 : 0);
 
       glUniform1f(z_near_location, static_cast<float>(kZNear));
       glUniform1f(z_far_location, static_cast<float>(kZFar));

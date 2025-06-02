@@ -145,16 +145,16 @@ float calculateSSAO(vec2 texCoord, vec3 position, vec3 normal) {
     occlusion = clamp(occlusion, 0.0, 1.0);
     
     // Return AO factor (0.0 = fully occluded, 1.0 = no occlusion)
-    return 1.0 - occlusion;
+    return 1 - occlusion;
 }
 
 void main()
 {
     float depth = texture(depth_texture, v_uv).r;
 
-    // Skip background pixels - output white (no occlusion)
+    // Skip background pixels - output black (no occlusion)
     if (depth >= 1.0) {
-        frag_color = vec4(1.0, 1.0, 1.0, 1.0);
+        frag_color = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
 
