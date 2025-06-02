@@ -31,8 +31,14 @@ const std::vector<std::vector<std::string>> kShaderFiles = {
 const std::vector<std::string> kGBufferShaderFiles = {
     "../shaders/gbuffer.vert", "../shaders/gbuffer.frag"
 };
-const std::vector<std::string> kSecondPassShaderFiles = {
-    "../shaders/second_pass.vert", "../shaders/second_pass.frag"
+const std::vector<std::string> kFinalShaderFiles = {
+    "../shaders/quad.vert", "../shaders/final.frag"
+};
+const std::vector<std::string> kSSAOShaderFiles = {
+      "../shaders/quad.vert", "../shaders/ssao.frag"  // Pure SSAO calculation
+  };
+const std::vector<std::string> kBlurShaderFiles = {
+    "../shaders/quad.vert", "../shaders/blur.frag"  // Blur pass
 };
 
 const int kVertexAttributeIdx = 0;
@@ -158,19 +164,31 @@ bool LoadProgram(const std::string &vertex, const std::string &fragment,
 GLWidget::GLWidget(QWidget *parent)
     : QOpenGLWidget(parent),
       initialized_(false),
-      SSAO_enabled_(true),
       width_(0.0),
       height_(0.0),
       currentShader_(0),
       currentTexture_(0),
-      currentSSAORenderMode_(0),
       fresnel_(0.2, 0.2, 0.2),
       skyVisible_(true),
       metalness_(0),
       roughness_(0),
       albedo_(1.0, 1.0, 1.0),
       useTextures_(false),
-      applyGammaCorrection_(false)
+      applyGammaCorrection_(false),
+      // SSAO
+      SSAO_enabled_(true),
+      currentSSAORenderMode_(3), // 0 - Normals, 1 - Albedo, 2 - Depth, 3 - SSAO, 4 - Blurred SSAO, 5 - Final Composition
+      ssao_num_directions_(16),
+      ssao_samples_per_direction_(4),
+      ssao_sample_radius_(0.5f),
+      use_randomization_(false),
+      use_blur_(true),
+      blur_type_(2),            // Bilateral blur
+      blur_radius_(2.0f),
+      normal_threshold_(0.8f),
+      depth_threshold_(0.01f),
+      bias_angle_(0.1f),
+      ao_strength_(1.0f)
       {
   setFocusPolicy(Qt::StrongFocus);
 }
@@ -457,9 +475,6 @@ void GLWidget::initializeGL ()
   glGenTextures(1, &color_map_);
   glGenTextures(1, &roughness_map_);
   glGenTextures(1, &metalness_map_);
-  glGenTextures(1, &albedo_texture_);
-  glGenTextures(1, &normal_texture_);
-  glGenTextures(1, &depth_texture_);
 
   //create shader programs
   programs_.push_back(std::make_unique<QOpenGLShaderProgram>());//phong
@@ -487,15 +502,32 @@ void GLWidget::initializeGL ()
     exit(0);
   }
 
-  second_pass_program_ = std::make_unique<QOpenGLShaderProgram>();
-  res = LoadProgram(kSecondPassShaderFiles[0], kSecondPassShaderFiles[1], second_pass_program_.get());
+  // Load SSAO shader
+  ssao_program_ = std::make_unique<QOpenGLShaderProgram>();
+  res = LoadProgram(kSSAOShaderFiles[0], kSSAOShaderFiles[1], ssao_program_.get());
   if (!res) {
-    std::cerr << "Error loading Second Pass shader." << std::endl;
-    exit(0);
+      std::cerr << "Error loading SSAO shader." << std::endl;
+      exit(0);
   }
 
-  LoadModel(".null"); // Load a sphere as default model
-  // LoadModel("../models/dragon_vrip.ply");
+  // Load blur shader
+  blur_program_ = std::make_unique<QOpenGLShaderProgram>();
+  res = LoadProgram(kBlurShaderFiles[0], kBlurShaderFiles[1], blur_program_.get());
+  if (!res) {
+      std::cerr << "Error loading blur shader." << std::endl;
+      exit(0);
+  }
+
+  // Load final composition shader
+  final_program_ = std::make_unique<QOpenGLShaderProgram>();
+  res = LoadProgram(kFinalShaderFiles[0], kFinalShaderFiles[1], final_program_.get());
+  if (!res) {
+      std::cerr << "Error loading final composition shader." << std::endl;
+      exit(0);
+  }
+
+  // LoadModel(".null"); // Load a sphere as default model
+  LoadModel("../models/mercedes-benz-clk430-convertible_ply/Mercedes-Benz CLK 430 Convertible.ply");
 
   // Load textures and cube maps
   LoadDefaultMaterials();
@@ -550,7 +582,7 @@ void GLWidget::InitializeSSAO() {
 
   glGenTextures(1, &depth_texture_);
   glBindTexture(GL_TEXTURE_2D, depth_texture_);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, scrWidth, scrHeight, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, NULL);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, scrWidth, scrHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -606,6 +638,64 @@ void GLWidget::InitializeSSAO() {
   if (error != GL_NO_ERROR) {
       std::cerr << "OpenGL error at line " << __LINE__ << ": " << error << std::endl;
   }
+
+  // SSAO texture
+  glGenTextures(1, &ssao_texture_);
+  glBindTexture(GL_TEXTURE_2D, ssao_texture_);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, scrWidth, scrHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+  // Generate the SSAO FBO to attach the texture
+  glGenFramebuffers(1, &ssao_FBO_);
+  glBindFramebuffer(GL_FRAMEBUFFER, ssao_FBO_);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssao_texture_, 0);
+  glDrawBuffer(GL_COLOR_ATTACHMENT0);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  // Create blurred SSAO texture
+  glGenTextures(1, &blurred_ssao_texture_);
+  glBindTexture(GL_TEXTURE_2D, blurred_ssao_texture_);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, scrWidth, scrHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+  // Generate the blurred SSAO FBO to attach the texture
+  glGenFramebuffers(1, &blur_FBO_);
+  glBindFramebuffer(GL_FRAMEBUFFER, blur_FBO_);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, blurred_ssao_texture_, 0);
+  glDrawBuffer(GL_COLOR_ATTACHMENT0);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  // Create Noise texture for SSAO
+  const int noise_size = scrWidth > scrHeight ? scrWidth : scrHeight;
+  std::vector<glm::vec3> noise_data(noise_size * noise_size);
+  
+  // Generate random vectors
+  for (int i = 0; i < noise_size * noise_size; i++) {
+      glm::vec3 noise_vec(
+          (rand() / float(RAND_MAX)) * 2.0f - 1.0f,
+          (rand() / float(RAND_MAX)) * 2.0f - 1.0f,
+          0.0f  // Keep Z = 0 for rotation around Z-axis
+      );
+      noise_data[i] = glm::normalize(noise_vec);
+  }
+
+  glGenTextures(1, &noise_texture_);
+  glBindTexture(GL_TEXTURE_2D, noise_texture_);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, scrWidth, scrHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, &noise_data[0]);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glBindTexture(GL_TEXTURE_2D, 0);
+
 }
 
 void GLWidget::LoadDefaultMaterials(){
@@ -883,6 +973,8 @@ void GLWidget::renderWithSSAO ()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     if (initialized_) {
+      // define default framebuffer object (FBO) for rendering
+      GLuint defaultFBO = QOpenGLContext::currentContext()->defaultFramebufferObject();
       camera_.SetViewport();
 
       glm::mat4x4 projection = camera_.SetProjection();
@@ -901,19 +993,22 @@ void GLWidget::renderWithSSAO ()
       glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, albedo_texture_);
       glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, normal_texture_);
       glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, depth_texture_);
+      glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, noise_texture_);
+      glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D, ssao_texture_);
 
       // FIRST PASS: G-Buffer generation
       glBindFramebuffer(GL_FRAMEBUFFER, g_buffer_FBO_);
       // Check framebuffer status after binding
-      GLenum fbStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-      if (fbStatus != GL_FRAMEBUFFER_COMPLETE) {
-          std::cerr << "[renderWithSSAO] FBO incomplete! Status: 0x" << std::hex << fbStatus << " (" << fbStatusString(fbStatus) << ")" << std::endl;
-      }
+      // GLenum fbStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+      // if (fbStatus != GL_FRAMEBUFFER_COMPLETE) {
+      //     std::cerr << "[renderWithSSAO] FBO incomplete! Status: 0x" << std::hex << fbStatus << " (" << fbStatusString(fbStatus) << ")" << std::endl;
+      // }
+
       glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
       if (mesh_ != nullptr) {
-          GLint projection_location, view_location, model_location, normal_matrix_location;
+          GLint projection_location, view_location, model_location, normal_matrix_location, albedo_location;
 
           gbuffer_program_->bind();
 
@@ -921,64 +1016,82 @@ void GLWidget::renderWithSSAO ()
           view_location           = gbuffer_program_->uniformLocation("view");
           model_location          = gbuffer_program_->uniformLocation("model");
           normal_matrix_location  = gbuffer_program_->uniformLocation("normal_matrix");
+          albedo_location         = gbuffer_program_->uniformLocation("albedo");
 
           glUniformMatrix4fv(projection_location, 1, GL_FALSE, &projection[0][0]);
           glUniformMatrix4fv(view_location, 1, GL_FALSE, &view[0][0]);
           glUniformMatrix4fv(model_location, 1, GL_FALSE, &model[0][0]);
           glUniformMatrix3fv(normal_matrix_location, 1, GL_FALSE, &normal[0][0]);
+          glUniform3f(albedo_location, albedo_[0], albedo_[1], albedo_[2]);
 
           glBindVertexArray(VAO);
           glDrawElements(GL_TRIANGLES, mesh_->faces_.size(), GL_UNSIGNED_INT, (GLvoid*)0);
           glBindVertexArray(0);
       }
 
-      // FINAL STEP: Render to the screen
-      GLuint albedo_texture_location, normal_texture_location, depth_texture_location, ssao_render_mode_location;
-      GLenum error = glGetError();
-        if (error != GL_NO_ERROR) {
-            std::cerr << "OpenGL error before binding framebuffer: " << error << std::endl;
-        }
+      // PASS 2: SSAO calculation → Pure AO output
+      glBindFramebuffer(GL_FRAMEBUFFER, ssao_FBO_);
+      glViewport(0, 0, width_, height_);
+      glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+      glClear(GL_COLOR_BUFFER_BIT);
 
-      // Use Qt's default framebuffer for the window (required for macOS/Metal)
-      glBindFramebuffer(GL_FRAMEBUFFER, QOpenGLContext::currentContext()->defaultFramebufferObject());
-      // Check default framebuffer completeness (should always be complete, but check for debugging)
-      GLenum fbStatusDefault = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-      if (fbStatusDefault != GL_FRAMEBUFFER_COMPLETE) {
-          std::cerr << "[renderWithSSAO] Default framebuffer incomplete! Status: 0x" << std::hex << fbStatusDefault << " (" << fbStatusString(fbStatusDefault) << ")" << std::endl;
-      }
+      ssao_program_->bind();
+
+      // Textures
+      glUniform1i(ssao_program_->uniformLocation("normal_texture"), 1);
+      glUniform1i(ssao_program_->uniformLocation("depth_texture"), 2);
+      glUniform1i(ssao_program_->uniformLocation("noise_texture"), 3);
+
+      // Set SSAO parameters
+      glUniform1i(ssao_program_->uniformLocation("num_directions"), ssao_num_directions_);
+      glUniform1i(ssao_program_->uniformLocation("samples_per_direction"), ssao_samples_per_direction_);
+      glUniform1f(ssao_program_->uniformLocation("sample_radius"), ssao_sample_radius_);
+      glUniformMatrix4fv(ssao_program_->uniformLocation("projection"), 1, GL_FALSE, &projection[0][0]);
+      glUniform2f(ssao_program_->uniformLocation("viewport_size"), width_, height_);
+
+      glUniform2f(ssao_program_->uniformLocation("noise_scale"), width_/4.0f, height_/4.0f);
+      glUniform1f(ssao_program_->uniformLocation("zNear"), static_cast<float>(kZNear));
+      glUniform1f(ssao_program_->uniformLocation("zFar"), static_cast<float>(kZFar));
+      glUniform1f(ssao_program_->uniformLocation("fov"), static_cast<float>(kFieldOfView));
+      glUniform1i(ssao_program_->uniformLocation("use_randomization"), use_randomization_ ? 1 : 0);
+      glUniform1f(ssao_program_->uniformLocation("bias_angle"), bias_angle_);
+
+      glBindVertexArray(quad_VAO);
+      glDrawArrays(GL_TRIANGLES, 0, 6);
+      glBindVertexArray(0);
+      ssao_program_->release();
+
+
+      // FINAL STEP: Render to the screen
+      GLuint albedo_texture_location, normal_texture_location, depth_texture_location, ssao_texture_location, 
+      ssao_render_mode_location, z_near_location, z_far_location;
+
+      glBindFramebuffer(GL_FRAMEBUFFER, defaultFBO);
       glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-      error = glGetError();
-        if (error != GL_NO_ERROR) {
-            std::cerr << "OpenGL error after binding framebuffer: " << error << std::endl;
-        }
 
-      second_pass_program_->bind();
-      albedo_texture_location    = second_pass_program_->uniformLocation("albedo_texture");
-      normal_texture_location    = second_pass_program_->uniformLocation("normal_texture");
-      depth_texture_location     = second_pass_program_->uniformLocation("depth_texture");
-      ssao_render_mode_location  = second_pass_program_->uniformLocation("ssao_render_mode");
+      final_program_->bind();
+      albedo_texture_location         = final_program_->uniformLocation("albedo_texture");
+      normal_texture_location         = final_program_->uniformLocation("normal_texture");
+      depth_texture_location          = final_program_->uniformLocation("depth_texture");
+      ssao_texture_location           = final_program_->uniformLocation("ssao_texture");
+      ssao_render_mode_location       = final_program_->uniformLocation("ssao_render_mode");
+      z_near_location                 = final_program_->uniformLocation("zNear");
+      z_far_location                  = final_program_->uniformLocation("zFar");
 
       glUniform1i(albedo_texture_location, 0);   // albedo texture
       glUniform1i(normal_texture_location, 1);   // normal texture
       glUniform1i(depth_texture_location, 2);    // depth texture
-      glUniform1i(ssao_render_mode_location, 0); // Show normal buffer visualization
-      
-      error = glGetError();
-        if (error != GL_NO_ERROR) {
-            std::cerr << "OpenGL error before quad rendering: " << error << std::endl;
-        }
+      glUniform1i(ssao_texture_location, 4);     // SSAO texture
+      glUniform1i(ssao_render_mode_location, currentSSAORenderMode_);
+
+      glUniform1f(z_near_location, static_cast<float>(kZNear));
+      glUniform1f(z_far_location, static_cast<float>(kZFar));
       
       glBindVertexArray(quad_VAO);
       glDrawArrays(GL_TRIANGLES, 0, 6);
-
-      // Check for errors after quad rendering
-      error = glGetError();
-      if (error != GL_NO_ERROR) {
-          std::cerr << "OpenGL error after quad rendering: " << error << std::endl;
-      }
-
       glBindVertexArray(0);
+      final_program_->release();
     }
 }
 
@@ -1073,4 +1186,68 @@ void GLWidget::SetRoughness(double d) {
     update();
 }
 
+void GLWidget::SetSSAODirections(int directions) {
+    ssao_num_directions_ = std::max(4, directions);
+    update();
+}
+
+void GLWidget::SetSSAOSamplesPerDirection(int samples) {
+    ssao_samples_per_direction_ = std::max(1, samples);
+    update();
+}
+
+void GLWidget::SetSSAORadius(double radius) {
+    ssao_sample_radius_ = static_cast<float>(std::max(0.01, radius));
+    update();
+}
+
+void GLWidget::SetSSAORenderMode(int mode) {
+    currentSSAORenderMode_ = mode;
+    update();
+}
+
+void GLWidget::EnableSSAO(bool enable) {
+    SSAO_enabled_ = enable;
+    update();
+}
+
+void GLWidget::SetUseRandomization(bool use) {
+    use_randomization_ = use;
+    update();
+}
+
+void GLWidget::SetUseBlur(bool use) {
+    use_blur_ = use;
+    update();
+}
+
+void GLWidget::SetBlurType(int type) {
+    blur_type_ = std::max(0, std::min(3, type));
+    update();
+}
+
+void GLWidget::SetBlurRadius(double radius) {
+    blur_radius_ = static_cast<float>(std::max(1.0, std::min(10.0, radius)));
+    update();
+}
+
+void GLWidget::SetNormalThreshold(double threshold) {
+    normal_threshold_ = static_cast<float>(std::max(0.0, std::min(1.0, threshold)));
+    update();
+}
+
+void GLWidget::SetDepthThreshold(double threshold) {
+    depth_threshold_ = static_cast<float>(std::max(0.001, std::min(0.1, threshold)));
+    update();
+}
+
+void GLWidget::SetBiasAngle(double angle) {
+    bias_angle_ = static_cast<float>(std::max(0.0, std::min(0.5, angle)));
+    update();
+}
+
+void GLWidget::SetAOStrength(double strength) {
+    ao_strength_ = static_cast<float>(std::max(0.0, std::min(2.0, strength)));
+    update();
+}
 

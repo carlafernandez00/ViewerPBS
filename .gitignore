@@ -16,6 +16,7 @@ Makefile*
 /debug/
 /release/
 /shaders/shaders
+/models/
 
 # Object files
 *.o

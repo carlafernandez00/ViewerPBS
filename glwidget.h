@@ -100,6 +100,43 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    */
   void SetAlbedo(double, double, double);
 
+  /**
+   * @brief SetSSAODirections Sets the number of directions for SSAO sampling
+   */
+  void SetSSAODirections(int directions);
+
+  /**
+   * @brief SetSSAOSamplesPerDirection Sets the number of samples per direction for SSAO
+   */
+  void SetSSAOSamplesPerDirection(int samples);
+
+  /**
+   * @brief SetSSAORadius Sets the sampling radius for SSAO
+   */
+  void SetSSAORadius(double radius);
+
+  /**
+   * @brief SetSSAORenderMode Sets the current SSAO render mode
+   */
+  void SetSSAORenderMode(int mode);
+
+  /**
+   * @brief EnableSSAO Enables or disables SSAO rendering
+   */
+  void EnableSSAO(bool enable);
+
+  /**
+   * @brief SSAO Enhancement Controls
+   * These methods allow the user to control the SSAO enhancement features such as randomization, blurring, and parameters for the blur effect.
+   */
+  void SetUseRandomization(bool use);
+  void SetUseBlur(bool use);
+  void SetBlurType(int type);
+  void SetBlurRadius(double radius);
+  void SetNormalThreshold(double threshold);
+  void SetDepthThreshold(double threshold);
+  void SetBiasAngle(double angle);
+  void SetAOStrength(double strength);
 
  protected:
   /**
@@ -137,14 +174,14 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
   std::vector<std::unique_ptr<QOpenGLShaderProgram>> programs_;
 
   /**
-   * @brief gbuffer_program_ Program used for the G-Buffer pass in SSAO.
+   * @brief SSAO shader programs
+   * These programs are used for the G-Buffer pass, SSAO calculation, blur pass, and final composition.
    */
-  std::unique_ptr<QOpenGLShaderProgram> gbuffer_program_;
+  std::unique_ptr<QOpenGLShaderProgram> gbuffer_program_;   // G-Buffer pass for SSAO
+  std::unique_ptr<QOpenGLShaderProgram> ssao_program_;      // Pure SSAO calculation
+  std::unique_ptr<QOpenGLShaderProgram> blur_program_;      // Blur pass
+  std::unique_ptr<QOpenGLShaderProgram> final_program_;     // Final composition
 
-  /**
-   * @brief second_pass_program_ Program used for the second pass in SSAO.
-   */
-  std::unique_ptr<QOpenGLShaderProgram> second_pass_program_;
 
   /**
    * @brief camera_ Class that computes the multiple camera transform matrices.
@@ -283,6 +320,20 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    */
   bool applyGammaCorrection_;
 
+  /**
+   * @brief SSAO parameters
+   */
+  int ssao_num_directions_;
+  int ssao_samples_per_direction_;
+  float ssao_sample_radius_;
+  bool use_randomization_;
+  bool use_blur_;
+  int blur_type_;               // 0=None, 1=Simple, 2=Bilateral, 3=Gaussian
+  float blur_radius_;
+  float normal_threshold_;      // For bilateral blur
+  float depth_threshold_;       // For bilateral blur
+  float bias_angle_;            // To reduce tangent surface artifacts
+  float ao_strength_;           // AO effect strength
 
   GLuint VAO;
   GLuint VBO_v;
@@ -298,6 +349,14 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
 
   GLuint quad_VAO;
   GLuint quad_VBO;
+
+  GLuint ssao_texture_;
+  GLuint ssao_FBO_;
+  GLuint blurred_ssao_texture_;
+  GLuint blur_FBO_;
+  GLuint noise_texture_;
+
+
 
  protected slots:
   /**
@@ -418,7 +477,6 @@ class GLWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
    * @brief SetFaces Signal that updates the interface label "Framerate".
    */
   void SetFramerate(QString);
-
 
 
 };
