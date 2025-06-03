@@ -1027,6 +1027,7 @@ void GLWidget::renderWithSSAO ()
       glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, noise_texture_);
       glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D, ssao_texture_);
       glActiveTexture(GL_TEXTURE5); glBindTexture(GL_TEXTURE_2D, blurred_ssao_texture_);
+      glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, color_map_);
 
       // FIRST PASS: G-Buffer generation
       glBindFramebuffer(GL_FRAMEBUFFER, g_buffer_FBO_);
@@ -1040,7 +1041,8 @@ void GLWidget::renderWithSSAO ()
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
       if (mesh_ != nullptr) {
-          GLint projection_location, view_location, model_location, normal_matrix_location, albedo_location;
+          GLint projection_location, view_location, model_location, normal_matrix_location, albedo_location, color_map_location,
+          use_textures_location;
 
           gbuffer_program_->bind();
 
@@ -1049,12 +1051,16 @@ void GLWidget::renderWithSSAO ()
           model_location          = gbuffer_program_->uniformLocation("model");
           normal_matrix_location  = gbuffer_program_->uniformLocation("normal_matrix");
           albedo_location         = gbuffer_program_->uniformLocation("albedo");
+          color_map_location      = gbuffer_program_->uniformLocation("color_map");
+          use_textures_location   = gbuffer_program_->uniformLocation("use_textures");
 
           glUniformMatrix4fv(projection_location, 1, GL_FALSE, &projection[0][0]);
           glUniformMatrix4fv(view_location, 1, GL_FALSE, &view[0][0]);
           glUniformMatrix4fv(model_location, 1, GL_FALSE, &model[0][0]);
           glUniformMatrix3fv(normal_matrix_location, 1, GL_FALSE, &normal[0][0]);
           glUniform3f(albedo_location, albedo_[0], albedo_[1], albedo_[2]);
+          glUniform1i(color_map_location, 6);
+          glUniform1i(use_textures_location, useTextures_ ? 1 : 0);
 
           glBindVertexArray(VAO);
           glDrawElements(GL_TRIANGLES, mesh_->faces_.size(), GL_UNSIGNED_INT, (GLvoid*)0);

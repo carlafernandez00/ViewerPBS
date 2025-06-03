@@ -72,20 +72,13 @@ float getRandomRotation(vec2 texCoord) {
 }
 
 // Compute tangent angle for HBAO 
-float computeTangentAngle(vec3 normal, vec2 screen_direction, vec3 position) {
-    // The tangent angle t(θ) is the signed elevation angle of the surface tangent vector
+float computeTangentAngle(vec3 normal, vec2 screenDirection, vec3 position) {
+    // Create tangent vector in screen space
+    vec3 tangent = normalize(vec3(screenDirection.x, screenDirection.y, 0.0));
     
-    // Project the normal onto the plane perpendicular to view direction
-    vec3 view_dir = vec3(0.0, 0.0, 1.0); // View direction in eye space (+Z)
-    vec3 projected_normal = normal - view_dir * dot(normal, view_dir);
-    projected_normal = normalize(projected_normal);
-
-    // Convert screen direction to eye space direction
-    vec3 eye_direction = normalize(vec3(screen_direction, 0.0));
-    
-    // Calculate tangent angle: signed elevation angle of surface tangent
-    float dot_product = clamp(dot(projected_normal, eye_direction), -1.0, 1.0);
-    return asin(dot_product);
+    // Calculate angle between normal and tangent
+    float cosAngle = dot(normal, tangent);
+    return asin(clamp(cosAngle, -1.0, 1.0));
 }
 
 // HBAO horizon angle computation
@@ -129,7 +122,7 @@ float computeHorizonAngle(vec2 texCoord, vec3 position, vec3 normal, vec2 direct
         // elevation angle formula: α(Si) = atan(-D.z/||D.xy||)
         float horizontal_distance = length(D.xy);
         if (horizontal_distance > 0.001) {
-            float elevation_angle = atan(-D.z / horizontal_distance);
+            float elevation_angle = atan(D.z / horizontal_distance);
 
             // h(θ) = max(t(θ), α(Si), i = 1..Ns)
             if (elevation_angle > max_horizon_angle) {
@@ -142,38 +135,38 @@ float computeHorizonAngle(vec2 texCoord, vec3 position, vec3 normal, vec2 direct
     return max_horizon_angle;
 }
 
-// HBAO calculation -> paper's equation (3)
 float calculateHBAO(vec2 texCoord, vec3 position, vec3 normal) {
     float totalAO = 0.0;
-    float random_rotation = getRandomRotation(texCoord);
+    float randomRotation = getRandomRotation(texCoord);
     
-    // Paper uses Monte Carlo integration over Nd directions
+    // Sample in different directions
     for (int dir = 0; dir < num_directions; dir++) {
-        // Calculate direction angle
-        float base_angle = (float(dir) / float(num_directions)) * 2.0 * PI;
-        float angle = base_angle + random_rotation;
+        float baseAngle = (float(dir) / float(num_directions)) * 2.0 * PI;
+        float angle = baseAngle + randomRotation;
         vec2 direction = vec2(cos(angle), sin(angle));
         
         // Compute tangent angle for this direction
-        float tangent_angle = computeTangentAngle(normal, direction, position);
-
+        float tangentAngle = computeTangentAngle(normal, direction, position);
+        
         // Compute horizon angle
         float attenuation;
-        float horizon_angle = computeHorizonAngle(texCoord, position, normal, direction, tangent_angle, attenuation);
-
-        // A = 1 - (1/2π) ∫ (sin(h(θ)) - sin(t(θ)))W(θ)dθ -> Monte Carlo
-        float sin_horizon = sin(clamp(horizon_angle, -PI/2.0, PI/2.0));
-        float sin_tangent = sin(clamp(tangent_angle, -PI/2.0, PI/2.0));
-
-        float ao_contribution = (sin_horizon - sin_tangent) * attenuation;
-        totalAO += max(0.0, ao_contribution);
+        float horizonAngle = computeHorizonAngle(texCoord, position, normal, direction, tangentAngle, attenuation);
+        
+        // HBAO integration: (sin(horizon) - sin(tangent)) * attenuation
+        float sinHorizon = sin(clamp(horizonAngle, -PI/2.0, PI/2.0));
+        float sinTangent = sin(clamp(tangentAngle, -PI/2.0, PI/2.0));
+        
+        // Calculate AO contribution for this direction
+        float aoContribution = max(0.0, (sinHorizon - sinTangent)) * attenuation;
+        totalAO += aoContribution;
     }
+    
+    // Normalize by number of directions (monte carlo average)
+    totalAO = totalAO / float(num_directions);
 
-    // Monte Carlo integration: (2π/Nd) * (1/2π) * sum = sum/Nd
-    float ao = 1.0 - (totalAO / float(num_directions));
-    return clamp(ao, 0.0, 1.0);
+    // Return inverted AO factor: higher values = more occlusion = darker
+    return 1.0 - clamp(totalAO, 0.0, 1.0);
 }
-
 
 // SSAO calculation 
 float calculateSSAO(vec2 texCoord, vec3 position, vec3 normal) {
